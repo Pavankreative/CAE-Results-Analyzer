@@ -1,0 +1,29 @@
+# vtk DataFile Version 3.0
+Small plate patch with nodal temperature (sample data)
+ASCII
+DATASET UNSTRUCTURED_GRID
+POINTS 6 float
+0.0 0.0 0.0
+1.0 0.0 0.0
+2.0 0.0 0.0
+0.0 1.0 0.0
+1.0 1.0 0.0
+2.0 1.0 0.0
+CELLS 2 10
+4 0 1 4 3
+4 1 2 5 4
+CELL_TYPES 2
+9
+9
+POINT_DATA 6
+SCALARS temperature float 1
+LOOKUP_TABLE default
+20.0 24.5 31.2
+21.0 26.0 33.4
+VECTORS displacement float
+0.0 0.0 0.0
+0.01 0.0 0.0
+0.03 0.0 0.0
+0.0 0.01 0.0
+0.01 0.01 0.0
+0.03 0.02 0.0
