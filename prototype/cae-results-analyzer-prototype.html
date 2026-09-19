@@ -1,0 +1,2113 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CAE Results Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --graphite-900:#0d1216; --graphite-800:#121a20; --graphite-700:#18222a;
+  --graphite-600:#1e2a34; --line:#27353f; --line-soft:#1f2b34;
+  --ink:#dbe4ea; --ink-2:#9fb0bc; --ink-3:#6e808d;
+  --accent:#4c82d9; --accent-soft:rgba(76,130,217,.16); --accent-line:#3c6cbb;
+  --pass:#4f9d74; --warn:#d68b32; --crit:#cf5450; --info:#5f92ad; --neutral:#7a8c98;
+  --bg:var(--graphite-900); --surface:var(--graphite-800); --panel:var(--graphite-700);
+  --raise:var(--graphite-600);
+  --shadow:0 8px 28px rgba(0,0,0,.45);
+  --rail:212px; --lw:250px; --rw:296px; --bh:200px;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#eef1f4; --surface:#f7f9fb; --panel:#ffffff; --raise:#eaeff3;
+  --line:#ccd6de; --line-soft:#dde4ea;
+  --ink:#16222b; --ink-2:#4c5d6a; --ink-3:#778894;
+  --accent:#2b5fb8; --accent-soft:rgba(43,95,184,.12); --accent-line:#2b5fb8;
+  --pass:#2f7a55; --warn:#a9631a; --crit:#b13c38; --info:#3c6f8c;
+  --shadow:0 6px 22px rgba(24,40,55,.14);
+  color-scheme:light;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font:400 13px/1.45 var(--sans); -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+.num,code,kbd{font-family:var(--mono); font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit; color:inherit}
+button{background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line);border:3px solid transparent;background-clip:content-box;border-radius:6px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- app frame ---------- */
+.app{height:100%; display:grid; grid-template-rows:46px 1fr 24px}
+.cmdbar{
+  display:flex; align-items:center; gap:14px; padding:0 12px;
+  background:var(--surface); border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:center;gap:9px;padding-right:12px;border-right:1px solid var(--line);height:100%}
+.brand svg{display:block}
+.brand b{font-weight:600;letter-spacing:.2px;font-size:13.5px}
+.brand span{color:var(--ink-3);font-family:var(--mono);font-size:10.5px}
+.cmd-actions{display:flex;gap:2px;flex-wrap:wrap}
+.cmd{padding:5px 10px;border-radius:4px;color:var(--ink-2);font-size:12.5px;white-space:nowrap}
+.cmd:hover{background:var(--raise);color:var(--ink)}
+.cmd.on{background:var(--accent-soft);color:var(--ink)}
+.cmd-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.ctx{
+  display:flex;align-items:center;gap:8px;padding:4px 10px;border:1px solid var(--line);
+  border-radius:4px;background:var(--panel);font-size:12px;max-width:44vw
+}
+.ctx .dot{width:6px;height:6px;border-radius:50%;background:var(--pass);flex:none}
+.ctx b{font-weight:500}
+.ctx i{font-style:normal;color:var(--ink-3);font-family:var(--mono);font-size:11px}
+.iconbtn{width:30px;height:28px;display:grid;place-items:center;border-radius:4px;color:var(--ink-2)}
+.iconbtn:hover{background:var(--raise);color:var(--ink)}
+
+.shell{display:grid;grid-template-columns:var(--rail) 1fr;min-height:0}
+.shell.collapsed{--rail:52px}
+
+/* ---------- rail ---------- */
+.rail{background:var(--surface);border-right:1px solid var(--line);overflow-y:auto;overflow-x:hidden;padding:8px 0 20px}
+.rail-group{padding:12px 14px 5px;color:var(--ink-3);font-size:10.5px;letter-spacing:.06em;font-family:var(--mono)}
+.shell.collapsed .rail-group{height:1px;padding:8px 0 0;margin:6px 10px;overflow:hidden;background:var(--line-soft);color:transparent}
+.navitem{
+  display:flex;align-items:center;gap:10px;width:100%;padding:7px 14px;color:var(--ink-2);
+  border-left:2px solid transparent;font-size:12.5px;text-align:left
+}
+.navitem svg{flex:none;opacity:.85}
+.navitem:hover{background:var(--raise);color:var(--ink)}
+.navitem.on{background:var(--accent-soft);color:var(--ink);border-left-color:var(--accent)}
+.navitem .tag{margin-left:auto;font-family:var(--mono);font-size:10px;padding:1px 5px;border-radius:3px;background:var(--raise);color:var(--ink-3)}
+.navitem.on .tag{background:rgba(0,0,0,.2)}
+.navitem .tag.crit{background:rgba(207,84,80,.2);color:var(--crit)}
+.shell.collapsed .navitem span,.shell.collapsed .navitem .tag{display:none}
+.shell.collapsed .navitem{justify-content:center;padding:9px 0}
+
+/* ---------- views ---------- */
+.view{display:none;min-height:0;overflow:hidden}
+.view.on{display:block;height:100%}
+.scroll{height:100%;overflow-y:auto;padding:18px 22px 40px}
+.vhead{display:flex;align-items:baseline;gap:14px;margin:0 0 4px}
+.vhead h1{margin:0;font-size:17px;font-weight:600;letter-spacing:-.1px}
+.vhead p{margin:0;color:var(--ink-3);font-size:12.5px}
+.sub{color:var(--ink-3);font-size:12px;margin:0 0 16px}
+
+.slab{background:var(--panel);border:1px solid var(--line);border-radius:5px}
+.slab>header{
+  display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);
+  font-size:12px;font-weight:500;color:var(--ink-2)
+}
+.slab>header .r{margin-left:auto;display:flex;gap:6px;align-items:center}
+.slab .body{padding:12px}
+.grid{display:grid;gap:14px}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:1180px){.g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:820px){.g4,.g3,.g2{grid-template-columns:1fr}}
+
+.stat{display:flex;flex-direction:column;gap:2px;padding:11px 13px}
+.stat .k{color:var(--ink-3);font-size:11px}
+.stat .v{font-family:var(--mono);font-size:20px;font-weight:500;letter-spacing:-.4px}
+.stat .d{font-size:11px;color:var(--ink-3)}
+
+table.data{width:100%;border-collapse:collapse;font-size:12.2px}
+table.data th{
+  text-align:left;font-weight:500;color:var(--ink-3);font-size:11px;padding:6px 10px;
+  border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)
+}
+table.data td{padding:7px 10px;border-bottom:1px solid var(--line-soft)}
+table.data tr:last-child td{border-bottom:none}
+table.data tbody tr:hover{background:var(--raise)}
+table.data td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.clickrow{cursor:pointer}
+
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:3px;font-size:11px;border:1px solid transparent;white-space:nowrap}
+.pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.pill.pass{color:var(--pass);background:rgba(79,157,116,.12);border-color:rgba(79,157,116,.3)}
+.pill.warn{color:var(--warn);background:rgba(214,139,50,.12);border-color:rgba(214,139,50,.3)}
+.pill.crit{color:var(--crit);background:rgba(207,84,80,.12);border-color:rgba(207,84,80,.3)}
+.pill.info{color:var(--info);background:rgba(95,146,173,.12);border-color:rgba(95,146,173,.3)}
+.pill.idle{color:var(--ink-3);background:var(--raise);border-color:var(--line)}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border:1px solid var(--line);
+  border-radius:4px;background:var(--raise);color:var(--ink);font-size:12.2px
+}
+.btn:hover{border-color:var(--ink-3)}
+.btn.primary{background:var(--accent);border-color:var(--accent-line);color:#fff}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.sm{padding:4px 8px;font-size:11.5px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+.qa{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:5px;overflow:hidden}
+@media(max-width:900px){.qa{grid-template-columns:repeat(2,1fr)}}
+.qa button{display:flex;flex-direction:column;gap:3px;padding:13px 14px;background:var(--panel);text-align:left}
+.qa button:hover{background:var(--raise)}
+.qa b{font-weight:500;font-size:12.5px}
+.qa i{font-style:normal;color:var(--ink-3);font-size:11.5px}
+
+/* ---------- workspace ---------- */
+.ws{
+  height:100%;display:grid;
+  grid-template-columns:var(--lw) 5px minmax(0,1fr) 5px var(--rw);
+  grid-template-rows:minmax(0,1fr) 5px var(--bh);
+  grid-template-areas:"tree v1 vp v2 props" "tree v1 h v2 props" "tree v1 dock v2 props";
+  background:var(--line-soft)
+}
+.ws .tree{grid-area:tree}
+.ws .vp{grid-area:vp}
+.ws .dock{grid-area:dock}
+.ws .props{grid-area:props}
+.split{background:var(--bg);position:relative}
+.split:hover,.split.drag{background:var(--accent)}
+.split.v{grid-row:1/4;cursor:col-resize}
+.split.v.a{grid-area:v1}
+.split.v.b{grid-column:4;grid-row:1/4}
+.split.h{grid-area:h;cursor:row-resize}
+.pane{background:var(--panel);display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+.pane>header{
+  display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;flex:none;
+  border-bottom:1px solid var(--line);background:var(--surface);font-size:11.5px;color:var(--ink-2)
+}
+.pane>header .r{margin-left:auto;display:flex;gap:4px;align-items:center}
+.pane .fill{flex:1;min-height:0;overflow:auto}
+
+.tabs{display:flex;gap:1px;overflow-x:auto;flex:none;background:var(--surface);border-bottom:1px solid var(--line)}
+.tabs button{padding:6px 11px;font-size:12px;color:var(--ink-3);border-bottom:2px solid transparent;white-space:nowrap}
+.tabs button:hover{color:var(--ink)}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--accent);background:var(--panel)}
+
+/* tree */
+.node{display:flex;align-items:center;gap:6px;padding:3.5px 10px;font-size:12.2px;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.node:hover{background:var(--raise);color:var(--ink)}
+.node.on{background:var(--accent-soft);color:var(--ink)}
+.node .tw{width:12px;flex:none;color:var(--ink-3);font-family:var(--mono);font-size:10px}
+.node .ic{flex:none;opacity:.8}
+.node .meta{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink-3)}
+.kids{display:none}
+.kids.open{display:block}
+
+/* viewport */
+.vpwrap{position:relative;flex:1;min-height:0;background:#0a0f13}
+:root[data-theme="light"] .vpwrap{background:#dfe6eb}
+#gl{display:block;width:100%;height:100%}
+.vptools{position:absolute;top:8px;left:8px;display:flex;gap:4px;flex-wrap:wrap;max-width:calc(100% - 16px)}
+.vptool{
+  width:30px;height:28px;display:grid;place-items:center;border:1px solid var(--line);
+  background:rgba(18,26,32,.88);color:var(--ink-2);border-radius:4px;backdrop-filter:blur(4px)
+}
+:root[data-theme="light"] .vptool{background:rgba(255,255,255,.9)}
+.vptool:hover{color:var(--ink);border-color:var(--ink-3)}
+.vptool.on{background:var(--accent);border-color:var(--accent-line);color:#fff}
+.legend{
+  position:absolute;right:10px;top:10px;width:132px;padding:8px;border:1px solid var(--line);
+  border-radius:4px;background:rgba(18,26,32,.9);backdrop-filter:blur(4px);font-size:10.5px
+}
+:root[data-theme="light"] .legend{background:rgba(255,255,255,.93)}
+.legend .lt{font-size:11px;color:var(--ink);margin-bottom:1px}
+.legend .lu{font-family:var(--mono);color:var(--ink-3);margin-bottom:6px}
+.legend .bar{display:flex;gap:6px}
+.legend canvas{width:16px;height:132px;border:1px solid var(--line);border-radius:2px;display:block}
+.legend .ticks{display:flex;flex-direction:column;justify-content:space-between;font-family:var(--mono);color:var(--ink-2)}
+.legend .ft{margin-top:6px;padding-top:6px;border-top:1px solid var(--line);color:var(--ink-3);font-family:var(--mono);line-height:1.6}
+.vpfoot{
+  position:absolute;left:8px;bottom:8px;right:8px;display:flex;align-items:center;gap:10px;
+  padding:6px 9px;border:1px solid var(--line);border-radius:4px;background:rgba(18,26,32,.9);
+  backdrop-filter:blur(4px);font-family:var(--mono);font-size:10.5px;color:var(--ink-2)
+}
+:root[data-theme="light"] .vpfoot{background:rgba(255,255,255,.92)}
+.vpfoot input[type=range]{flex:1;min-width:60px;accent-color:var(--accent)}
+.probe-tip{position:absolute;pointer-events:none;padding:5px 7px;border:1px solid var(--accent-line);background:rgba(18,26,32,.95);border-radius:3px;font-family:var(--mono);font-size:10.5px;display:none;z-index:5;line-height:1.5}
+:root[data-theme="light"] .probe-tip{background:rgba(255,255,255,.97)}
+.demo-flag{
+  position:absolute;right:10px;bottom:46px;font-size:10px;font-family:var(--mono);color:var(--ink-3);
+  border:1px dashed var(--line);padding:2px 6px;border-radius:3px;background:rgba(18,26,32,.7)
+}
+
+/* property rows */
+.prow{display:flex;gap:8px;padding:5px 10px;font-size:12px;border-bottom:1px solid var(--line-soft);align-items:center}
+.prow .k{color:var(--ink-3);flex:1;min-width:0}
+.prow .v{font-family:var(--mono);text-align:right;color:var(--ink)}
+.psec{padding:7px 10px 4px;font-size:10.5px;color:var(--ink-3);font-family:var(--mono);background:var(--surface);border-bottom:1px solid var(--line-soft);border-top:1px solid var(--line-soft)}
+.ctl{padding:8px 10px;display:flex;flex-direction:column;gap:5px;border-bottom:1px solid var(--line-soft)}
+.ctl label{font-size:11px;color:var(--ink-3);display:flex;justify-content:space-between;gap:6px}
+.ctl label b{font-family:var(--mono);font-weight:400;color:var(--ink-2)}
+select,input[type=text],input[type=number],textarea{
+  width:100%;padding:5px 7px;background:var(--raise);border:1px solid var(--line);
+  border-radius:3px;font-size:12px
+}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.chk{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2);padding:4px 10px;cursor:pointer}
+.chk input{accent-color:var(--accent)}
+.varlist{display:flex;flex-direction:column}
+.varlist button{display:flex;gap:8px;align-items:center;padding:5px 10px;font-size:12px;color:var(--ink-2);text-align:left;border-left:2px solid transparent}
+.varlist button:hover{background:var(--raise);color:var(--ink)}
+.varlist button.on{background:var(--accent-soft);color:var(--ink);border-left-color:var(--accent)}
+.varlist button .u{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink-3)}
+
+/* dock */
+.logline{display:flex;gap:9px;padding:2.5px 10px;font-family:var(--mono);font-size:11px;border-bottom:1px solid var(--line-soft)}
+.logline .t{color:var(--ink-3);flex:none}
+.logline .lv{flex:none;width:52px}
+.lv.INFO{color:var(--info)} .lv.WARN{color:var(--warn)} .lv.ERROR{color:var(--crit)} .lv.OK{color:var(--pass)}
+.plotwrap{padding:10px;display:grid;gap:12px}
+svg.plot{width:100%;display:block;background:transparent}
+svg.plot .ax{stroke:var(--line);stroke-width:1}
+svg.plot .gl{stroke:var(--line-soft);stroke-width:1}
+svg.plot text{fill:var(--ink-3);font-family:var(--mono);font-size:9px}
+svg.plot .ttl{fill:var(--ink-2);font-family:var(--sans);font-size:10.5px}
+
+/* findings */
+.finding{border:1px solid var(--line);border-radius:5px;background:var(--panel);overflow:hidden}
+.finding>.fh{display:flex;gap:10px;align-items:center;padding:9px 12px;cursor:pointer}
+.finding>.fh .ttl{font-weight:500;font-size:12.5px}
+.finding>.fh .loc{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.finding .fb{display:none;padding:0 12px 12px;border-top:1px solid var(--line-soft)}
+.finding.open .fb{display:block}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:4px 14px;font-size:12.2px;margin-top:10px}
+.kv dt{color:var(--ink-3)}
+.kv dd{margin:0}
+.evidence{margin-top:10px;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.evidence .eh{padding:5px 10px;background:var(--surface);font-size:10.5px;color:var(--ink-3);font-family:var(--mono);border-bottom:1px solid var(--line)}
+
+/* assistant */
+.chat{display:grid;grid-template-rows:1fr auto;height:100%}
+.msgs{overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:18px}
+.msg{max-width:820px}
+.msg.me{align-self:flex-end;background:var(--accent-soft);border:1px solid var(--accent-line);padding:8px 12px;border-radius:5px;font-size:12.8px}
+.ans{border:1px solid var(--line);border-radius:5px;background:var(--panel);overflow:hidden}
+.ans>.ah{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line);font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+.block{padding:10px 12px;border-bottom:1px solid var(--line-soft);display:grid;grid-template-columns:118px 1fr;gap:12px;font-size:12.6px}
+.block:last-child{border-bottom:none}
+.block .lbl{font-size:10.5px;font-family:var(--mono);padding-top:2px}
+.block .lbl.data{color:var(--info)} .block .lbl.calc{color:var(--accent)}
+.block .lbl.rule{color:var(--pass)} .block .lbl.interp{color:var(--warn)} .block .lbl.rec{color:var(--ink-2)}
+.block .lbl::before{content:"";display:inline-block;width:6px;height:6px;border-radius:1px;background:currentColor;margin-right:6px;vertical-align:1px}
+@media(max-width:760px){.block{grid-template-columns:1fr}}
+.composer{border-top:1px solid var(--line);background:var(--surface);padding:10px 22px 14px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.chip{padding:4px 9px;border:1px solid var(--line);border-radius:12px;font-size:11.5px;color:var(--ink-2);background:var(--panel)}
+.chip:hover{border-color:var(--accent);color:var(--ink)}
+.inrow{display:flex;gap:8px}
+.inrow input{flex:1}
+
+/* formula */
+.calc{border:1px solid var(--line);border-radius:5px;overflow:hidden;background:var(--panel)}
+.calc .ch{padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px;font-weight:500;display:flex;gap:8px;align-items:center}
+.formula{padding:12px;background:var(--surface);font-family:var(--mono);font-size:13.5px;text-align:center;border-bottom:1px solid var(--line);color:var(--ink)}
+.calc .ins{padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 14px;font-size:12px}
+.calc .ins div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dotted var(--line);padding-bottom:3px}
+.calc .ins span:last-child{font-family:var(--mono)}
+.calc .res{padding:9px 12px;background:var(--raise);display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line)}
+.calc .res b{font-family:var(--mono);font-size:16px;font-weight:500}
+.assump{padding:9px 12px;font-size:11.5px;color:var(--ink-3);border-top:1px solid var(--line-soft)}
+
+/* comparison */
+.cmp-heads{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.dualvp{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:5px;overflow:hidden;height:330px}
+.dualvp>div{position:relative;background:#0a0f13}
+:root[data-theme="light"] .dualvp>div{background:#dfe6eb}
+.dualvp canvas{display:block;width:100%;height:100%}
+.dualvp .tagv{position:absolute;top:8px;left:8px;font-family:var(--mono);font-size:10.5px;padding:2px 7px;border:1px solid var(--line);border-radius:3px;background:rgba(18,26,32,.85)}
+.bardiff{display:flex;align-items:center;gap:8px}
+.bardiff .track{flex:1;height:6px;background:var(--raise);border-radius:3px;overflow:hidden;position:relative}
+.bardiff .track i{position:absolute;top:0;bottom:0;background:var(--accent);display:block}
+.bardiff .track i.down{background:var(--pass)} .bardiff .track i.up{background:var(--crit)}
+
+/* report */
+.rep{display:grid;grid-template-columns:270px 1fr;gap:14px;height:100%;min-height:0}
+@media(max-width:900px){.rep{grid-template-columns:1fr}}
+.doc{background:var(--panel);border:1px solid var(--line);border-radius:5px;overflow:auto;padding:30px 36px}
+.doc h2{font-size:15px;margin:0 0 3px} .doc h3{font-size:12.5px;margin:20px 0 7px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.doc p{font-size:12.3px;color:var(--ink-2);margin:0 0 8px;max-width:72ch}
+.doc .meta{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-bottom:16px}
+.secpick{display:flex;flex-direction:column;overflow:auto}
+.toast{
+  position:fixed;left:50%;bottom:34px;transform:translateX(-50%);padding:8px 14px;border-radius:4px;
+  background:var(--raise);border:1px solid var(--line);box-shadow:var(--shadow);font-size:12.3px;z-index:60;
+  opacity:0;transition:opacity .18s
+}
+.toast.on{opacity:1}
+.status{
+  display:flex;align-items:center;gap:14px;padding:0 12px;background:var(--surface);
+  border-top:1px solid var(--line);font-family:var(--mono);font-size:10.5px;color:var(--ink-3)
+}
+.status .r{margin-left:auto;display:flex;gap:14px}
+.sep{width:1px;height:14px;background:var(--line)}
+.empty{padding:40px;text-align:center;color:var(--ink-3);font-size:12.5px}
+.empty b{display:block;color:var(--ink-2);font-weight:500;margin-bottom:5px;font-size:13px}
+.hint{font-size:11.5px;color:var(--ink-3);margin-top:10px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div class="toast" id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================
+   CAE Results Analyzer — demonstration build
+   All result values below are SIMULATED SAMPLE DATA.
+   ============================================================ */
+const U={ /* tiny dom helpers */
+  el(t,c,h){const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;},
+  q(s,r){return (r||document).querySelector(s)},
+  qa(s,r){return [...(r||document).querySelectorAll(s)]},
+  n(v,d){ if(v==null||isNaN(v))return '—'; const a=Math.abs(v);
+    if(a!==0&&(a<1e-2||a>=1e6))return v.toExponential(2);
+    return v.toFixed(d==null?2:d).replace(/\B(?=(\d{3})+(?!\d))/g,' ');},
+  toast(m){const t=U.q('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(U._tt); U._tt=setTimeout(()=>t.classList.remove('on'),2200);}
+};
+const ICONS={
+  home:'M2 7 8 2.5 14 7v6.5a.5.5 0 0 1-.5.5H10V9.5H6V14H2.5a.5.5 0 0 1-.5-.5Z',
+  folder:'M1.5 3.5h4l1.2 1.5h7.8v7.5h-13Z', sim:'M2 12.5 5.5 6l2.6 3.4L10.6 4 14 12.5Z',
+  fea:'M2 13 8 2l6 11Zm2.6-1.5h6.8L8 5.1Z', cfd:'M1.5 5c3-2 5 2 7.5 0s4-.5 5.5.5M1.5 8.5c3-2 5 2 7.5 0s4-.5 5.5.5M1.5 12c3-2 5 2 7.5 0s4-.5 5.5.5',
+  th:'M6 2v7.2a3 3 0 1 0 2 0V2Z', mbd:'M3 12.5 7 6l5 3 2-5', multi:'M8 1.5 14 5v6L8 14.5 2 11V5Z',
+  cmp:'M7 2v12M2.5 5.5h3M2.5 9h3M10.5 5.5h3M10.5 9h3', val:'M3 8.4 6.3 12 13 4',
+  diag:'M8 2 15 14H1ZM8 6.5v3.2M8 11.4v.9', ai:'M8 2.2 9.6 6.4 14 8l-4.4 1.6L8 13.8 6.4 9.6 2 8l4.4-1.6Z',
+  opt:'M2 13V6M6 13V3M10 13V8M14 13V5', rep:'M4 2h6l3 3v9H4ZM6 7h5M6 9.5h5M6 12h3',
+  data:'M8 2c3.3 0 6 1 6 2.3v7.4C14 13 11.3 14 8 14s-6-1-6-2.3V4.3C2 3 4.7 2 8 2ZM2 4.3C2 5.6 4.7 6.6 8 6.6s6-1 6-2.3',
+  set:'M8 5.6A2.4 2.4 0 1 0 8 10.4 2.4 2.4 0 0 0 8 5.6ZM8 1.6l.6 1.7 1.8-.6.9 1.6-1.3 1.3 1.3 1.3-.9 1.6-1.8-.6L8 14.4l-.6-1.7-1.8.6-.9-1.6 1.3-1.3-1.3-1.3.9-1.6 1.8.6Z'
+};
+function svgi(p,s){return `<svg width="${s||14}" height="${s||14}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="${ICONS[p]||p}"/></svg>`;}
+
+/* ---------------- colormaps ---------------- */
+const CMAPS={
+  jet:[[0,'#00007f'],[.12,'#0000ff'],[.32,'#00d4ff'],[.5,'#7cff79'],[.68,'#ffd400'],[.88,'#ff3b00'],[1,'#7f0000']],
+  viridis:[[0,'#440154'],[.25,'#3b528b'],[.5,'#21918c'],[.75,'#5ec962'],[1,'#fde725']],
+  coolwarm:[[0,'#3b4cc0'],[.25,'#7b9ff9'],[.5,'#e8e6e2'],[.75,'#f6a385'],[1,'#b40426']],
+  inferno:[[0,'#000004'],[.25,'#51127c'],[.5,'#b6377a'],[.75,'#fb8861'],[1,'#fcfdbf']],
+  steel:[[0,'#0f1b26'],[.3,'#2f5f7a'],[.6,'#8fb4c2'],[.85,'#e0d9c6'],[1,'#f6f3ec']]
+};
+function hex2rgb(h){return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+function cmap(name,t){
+  const s=CMAPS[name]||CMAPS.jet; t=Math.max(0,Math.min(1,t));
+  for(let i=0;i<s.length-1;i++){
+    if(t>=s[i][0]&&t<=s[i+1][0]){
+      const f=(t-s[i][0])/(s[i+1][0]-s[i][0]||1), a=hex2rgb(s[i][1]), b=hex2rgb(s[i+1][1]);
+      return [a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f, a[2]+(b[2]-a[2])*f];
+    }
+  }
+  return hex2rgb(s[s.length-1][1]);
+}
+
+/* ---------------- result variable catalogue ---------------- */
+/* f(x,y,z,t) returns a normalised 0..1 scalar field over the part */
+const V=(id,label,unit,min,max,cm,f,extra)=>Object.assign({id,label,unit,min,max,cm,f},extra||{});
+const clamp01=v=>Math.max(0,Math.min(1,v));
+const gauss=(d,s)=>Math.exp(-(d*d)/(2*s*s));
+
+const FIELDS={
+  bracket:{
+    vonmises:(x,y,z,t)=>clamp01(.08+.92*gauss(Math.hypot(x+34,y-6,z)/30,.62)*(.6+.4*t)+.12*gauss(Math.hypot(x-30,y-52,z-22)/40,.5)),
+    s1:(x,y,z,t)=>clamp01(.1+.8*gauss(Math.hypot(x+32,y-4,z)/32,.6)*(.6+.4*t)),
+    strain:(x,y,z,t)=>clamp01(.06+.9*gauss(Math.hypot(x+34,y-6,z)/30,.6)*(.6+.4*t)),
+    disp:(x,y,z,t)=>clamp01(((y+14)/74)**1.5*(.55+.45*t)+.05),
+    contact:(x,y,z,t)=>clamp01(gauss(Math.abs(y+10)/18,.35)*gauss(Math.abs(x-18)/40,.7)*(.5+.5*t)),
+    energy:(x,y,z,t)=>clamp01(.05+.8*gauss(Math.hypot(x+30,y-4)/34,.7)*(.5+.5*t)),
+    fos:(x,y,z,t)=>clamp01(1-(.08+.92*gauss(Math.hypot(x+34,y-6,z)/30,.62)*(.6+.4*t))),
+    mode:(x,y,z,t)=>clamp01(.5+.5*Math.sin((y+20)/22+t*6.28)*Math.cos(z/26)),
+    life:(x,y,z,t)=>clamp01(1-(.1+.85*gauss(Math.hypot(x+34,y-6,z)/30,.6)))
+  },
+  carbody:{
+    pressure:(x,y,z,t)=>clamp01(.55+.45*Math.tanh((x-.35)*2.6)-.5*gauss(Math.hypot(x-.15,y-.55)/1.1,.5)),
+    velocity:(x,y,z,t)=>clamp01(.25+.6*gauss(Math.abs(x)/2.2,.85)+.35*Math.abs(y)),
+    temperature:(x,y,z,t)=>clamp01(.3+.5*gauss(Math.hypot(x+1.2,y-.2)/2,.6)),
+    wallshear:(x,y,z,t)=>clamp01(.18+.7*gauss(Math.abs(x+.9)/2.4,.7)*(.6+.4*Math.abs(z))),
+    cp:(x,y,z,t)=>clamp01(.5+.5*Math.tanh((x-.3)*2.2)),
+    yplus:(x,y,z,t)=>clamp01(.32+.5*gauss(Math.abs(x-.2)/2.4,.9)),
+    vorticity:(x,y,z,t)=>clamp01(.12+.85*gauss(Math.abs(x-1.5)/1.6,.55)*(.5+.5*Math.abs(z)))
+  },
+  coldplate:{
+    temperature:(x,y,z,t)=>clamp01(.18+.62*((x+60)/120)+.3*gauss(Math.abs(Math.sin(z/14))-.2,.5)*(.6+.4*t)),
+    heatflux:(x,y,z,t)=>clamp01(.15+.8*gauss(Math.abs(Math.sin(z/14)),.35)*(.55+.45*t)),
+    gradient:(x,y,z,t)=>clamp01(.1+.75*gauss(Math.abs(Math.cos(z/14)),.3)),
+    htc:(x,y,z,t)=>clamp01(.25+.6*gauss(Math.abs(Math.sin(z/14+.5)),.4))
+  },
+  suspension:{
+    disp:(x,y,z,t)=>clamp01(.45+.5*Math.sin(t*6.28)*(y+40)/80),
+    velocity:(x,y,z,t)=>clamp01(.5+.45*Math.cos(t*6.28)*(y+40)/80),
+    accel:(x,y,z,t)=>clamp01(.5-.45*Math.sin(t*6.28)*(y+40)/80),
+    force:(x,y,z,t)=>clamp01(.2+.7*gauss(Math.hypot(x-18,y+22)/50,.6)*(.6+.4*Math.abs(Math.sin(t*6.28))))
+  }
+};
+
+const VARS={
+  bracket:[
+    V('vonmises','Equivalent (von Mises) stress','MPa',0.8,214.6,'jet',FIELDS.bracket.vonmises,{tab:'Stress',node:48213,loc:'Fillet root, rib–flange junction (−34.2, 6.1, 0.4) mm'}),
+    V('s1','Maximum principal stress','MPa',-46.2,187.2,'coolwarm',FIELDS.bracket.s1,{tab:'Stress',node:48207,loc:'Fillet root, outer surface'}),
+    V('strain','Equivalent elastic strain','mm/mm',1.1e-5,3.06e-3,'viridis',FIELDS.bracket.strain,{tab:'Strain',node:48213,loc:'Fillet root'}),
+    V('disp','Total deformation','mm',0,0.412,'jet',FIELDS.bracket.disp,{tab:'Displacement',node:51902,loc:'Upper flange free edge'}),
+    V('contact','Contact pressure','MPa',0,96.4,'inferno',FIELDS.bracket.contact,{tab:'Contact',node:22610,loc:'Bolt-washer seat, hole 2'}),
+    V('energy','Strain energy density','mJ/mm³',0,0.0184,'viridis',FIELDS.bracket.energy,{tab:'Energy',node:48213,loc:'Fillet root'}),
+    V('fos','Safety factor (yield)','—',1.29,15,'steel',FIELDS.bracket.fos,{tab:'Stress',node:48213,loc:'Fillet root',invert:true}),
+    V('mode','Mode shape — total','normalised',0,1,'coolwarm',FIELDS.bracket.mode,{tab:'Modal',node:51902,loc:'Flange tip'}),
+    V('life','Fatigue life','cycles',2.6e6,1e9,'viridis',FIELDS.bracket.life,{tab:'Fatigue',node:48213,loc:'Fillet root',invert:true})
+  ],
+  carbody:[
+    V('pressure','Static pressure','Pa',-1842,486,'coolwarm',FIELDS.carbody.pressure,{tab:'Pressure',loc:'Stagnation point, front fascia'}),
+    V('velocity','Velocity magnitude','m/s',0,41.3,'jet',FIELDS.carbody.velocity,{tab:'Velocity',loc:'Roof crown, x = 1.84 m'}),
+    V('cp','Pressure coefficient','—',-3.18,1.0,'coolwarm',FIELDS.carbody.cp,{tab:'Pressure',loc:'A-pillar shoulder'}),
+    V('wallshear','Wall shear stress','Pa',0,18.4,'inferno',FIELDS.carbody.wallshear,{tab:'Wall',loc:'Hood leading edge'}),
+    V('yplus','Wall y+','—',0.9,118,'viridis',FIELDS.carbody.yplus,{tab:'Wall',loc:'Underbody, rear diffuser'}),
+    V('temperature','Static temperature','°C',18.4,31.2,'inferno',FIELDS.carbody.temperature,{tab:'Thermal',loc:'Rear wake recirculation'}),
+    V('vorticity','Vorticity magnitude','1/s',0,2840,'viridis',FIELDS.carbody.vorticity,{tab:'Turbulence',loc:'C-pillar trailing vortex'})
+  ],
+  coldplate:[
+    V('temperature','Temperature','°C',24.8,58.3,'inferno',FIELDS.coldplate.temperature,{tab:'Temperature',loc:'Cell 6 footprint, outlet side'}),
+    V('heatflux','Total heat flux','kW/m²',0.4,42.6,'jet',FIELDS.coldplate.heatflux,{tab:'Heat flux',loc:'Channel wall, first pass'}),
+    V('gradient','Thermal gradient','K/mm',0.1,6.8,'viridis',FIELDS.coldplate.gradient,{tab:'Gradient',loc:'Channel rib'}),
+    V('htc','Heat transfer coefficient','W/m²·K',180,4260,'steel',FIELDS.coldplate.htc,{tab:'Convection',loc:'Channel wall, turn 3'})
+  ],
+  suspension:[
+    V('disp','Displacement magnitude','mm',0,78.2,'jet',FIELDS.suspension.disp,{tab:'Kinematics',loc:'Wheel centre'}),
+    V('velocity','Velocity magnitude','mm/s',0,612,'viridis',FIELDS.suspension.velocity,{tab:'Kinematics',loc:'Wheel centre'}),
+    V('accel','Acceleration magnitude','m/s²',0,12.4,'coolwarm',FIELDS.suspension.accel,{tab:'Kinematics',loc:'Wheel centre'}),
+    V('force','Joint reaction force','N',0,6842,'inferno',FIELDS.suspension.force,{tab:'Forces',loc:'Lower ball joint (J3)'})
+  ]
+};
+
+/* ---------------- projects ---------------- */
+const PROJECTS=[
+{
+  id:'BRK-114', geom:'bracket', domain:'FEA', name:'EV Battery Mounting Bracket',
+  type:'Linear static · bolt pretension · frictional contact', solver:'ANSYS Mechanical 2024 R2',
+  file:'brk_114_static.rst', size:'842 MB', owner:'P. Kumar', run:'2026-09-16 09:41', wall:'00:11:24',
+  status:'pass', valid:'Verified', crit:0, warn:1,
+  mesh:{Nodes:'612 480',Elements:'341 206','Element type':'SOLID187 / CONTA174','Average quality':'0.842','Max skewness':'0.61','Min orthogonality':'0.38','Max aspect ratio':'7.4','Mesh metric source':'Mechanical mesh metrics'},
+  materials:[{n:'AA6061-T6 (bracket)',p:'E 68.9 GPa · ν 0.33 · ρ 2700 kg/m³ · Sy 276 MPa · Su 310 MPa'},
+             {n:'Steel 10.9 (fasteners)',p:'E 210 GPa · ν 0.30 · ρ 7850 kg/m³ · Sy 940 MPa'}],
+  bcs:[{n:'Fixed support',p:'4 × bolt seat faces, all DOF'},{n:'Frictional contact',p:'μ = 0.15, bracket ↔ chassis rail'},
+       {n:'Bolt pretension',p:'M10 × 4, 21 kN each'},{n:'Symmetry',p:'Not used'}],
+  loads:[{n:'Battery pack inertia',p:'92 kg × 3 g vertical (−Y)'},{n:'Longitudinal shock',p:'1.5 g (−X), 18 ms half-sine'},{n:'Gravity',p:'9806.6 mm/s², −Y'}],
+  cases:['LC1 — 3 g vertical','LC2 — 1.5 g longitudinal','LC3 — combined 3 g + 1.5 g'],
+  keyvals:[['Peak von Mises','214.6 MPa'],['Minimum safety factor','1.29'],['Max total deformation','0.412 mm'],['Total reaction force','4 812 N']],
+  logs:[['09:41:02','INFO','Reading result file brk_114_static.rst (842 MB)'],['09:41:19','INFO','Result model built: 612 480 nodes / 341 206 elements'],
+        ['09:41:20','OK','Unit system resolved: mm–kg–N–s (consistent)'],['09:41:26','INFO','Load case LC3 selected (combined)'],
+        ['09:41:31','WARN','Stress singularity candidate at sharp re-entrant edge, node 48213 region'],['09:41:33','OK','Mesh convergence study located: 3 refinement levels'],
+        ['09:41:40','INFO','Derived quantity: safety factor from Sy = 276 MPa'],['09:41:41','OK','Post-processing complete — 9 result variables available']],
+  plots:[
+    {t:'Mesh convergence — peak von Mises',x:'Nodes (×10³)',y:'MPa',s:[{n:'Peak σ_vm',d:[[112,186.4],[248,201.9],[412,209.8],[612,214.6],[864,216.1]]}]},
+    {t:'Load case history — LC2 longitudinal shock',x:'Time (ms)',y:'MPa',s:[{n:'σ_vm @ node 48213',d:[[0,4],[3,62],[6,138],[9,196],[12,214.6],[15,171],[18,88],[21,22],[24,7]]}]}
+  ],
+  modes:[[1,412.6,'First bending, flange out-of-plane',0.71],[2,688.1,'Lateral bending',0.14],[3,1043.7,'Torsion about X',0.06],[4,1520.2,'Second bending',0.05],[5,1894.5,'Rib breathing',0.02],[6,2337.8,'Local flange mode',0.02]],
+  diag:[
+   {sev:'warn',t:'Stress concentration at re-entrant corner',loc:'Node 48213 · Body: Bracket · (−34.2, 6.1, 0.4) mm',
+    ev:[['Peak σ_vm','214.6 MPa'],['Neighbourhood mean (r = 3 mm)','96.4 MPa'],['Peak / mean ratio','2.23'],['Change from mesh level 3 → 4','+2.3 %'],['Element size at peak','0.8 mm']],
+    cause:'A 2.2× local gradient at a re-entrant corner with a small fillet radius. The value is still rising slightly with refinement, which is characteristic of either a genuine stress riser or a geometric singularity.',
+    action:'Compare σ_vm at levels 4 and 5 with a fillet radius sweep (R0.5 / R1.0 / R2.0). If the peak keeps climbing without converging, treat it as a singularity and evaluate a path-averaged stress over 2·t instead.'},
+   {sev:'info',t:'Contact status change between load steps',loc:'Contact pair CP-2 · Bolt seat, hole 2',
+    ev:[['Status at step 1','Sticking (100 %)'],['Status at step 3','Sliding (14 % of contact area)'],['Max penetration','0.0042 mm'],['Penetration tolerance','0.010 mm']],
+    cause:'Partial sliding developed once the longitudinal component was applied. Penetration remains inside tolerance, so the contact solution itself is well behaved.',
+    action:'Confirm that 14 % sliding is acceptable against the joint-slip requirement, and check the friction coefficient against the specified surface finish.'}
+  ],
+  valid:[
+   {n:'Mesh convergence',s:'pass',m:'Peak σ_vm changes by 0.7 % between the last two refinement levels (target ≤ 2 %).',
+    ev:[['Level 3 (412 k nodes)','209.8 MPa'],['Level 4 (612 k nodes)','214.6 MPa'],['Level 5 (864 k nodes)','216.1 MPa'],['Δ level 4→5','0.7 %'],['GCI (fine)','1.4 %']]},
+   {n:'Solver convergence',s:'pass',m:'All 3 load steps converged; force residual below criterion at every substep.',
+    ev:[['Load steps','3'],['Total substeps','27'],['Bisections','0'],['Final force residual','2.4e−4'],['Criterion','5.0e−3']]},
+   {n:'Analytical comparison',s:'pass',m:'Cantilever beam idealisation of the vertical flange agrees within 8.4 %.',
+    ev:[['Hand calculation σ = M·c/I','198.5 MPa'],['FE result at same section','214.6 MPa'],['Difference','8.1 %'],['Acceptance band','±15 %']]},
+   {n:'Reaction force balance',s:'pass',m:'Sum of reactions matches applied load to 0.02 %.',
+    ev:[['Applied load (LC3)','4 811 N'],['Σ reactions','4 812 N'],['Imbalance','0.02 %']]},
+   {n:'Unit consistency',s:'pass',m:'mm–kg–N–s system detected and consistent across geometry, material and load definitions.',ev:[['Length','mm'],['Force','N'],['Stress','MPa'],['Density','kg/m³ (converted)']]},
+   {n:'Experimental comparison',s:'idle',m:'No test data linked to this simulation.',ev:[['Strain gauge data','Not uploaded'],['Correlation report','Not available']]},
+   {n:'Sensitivity analysis',s:'warn',m:'Result is sensitive to friction coefficient; ±0.05 on μ moves peak stress by 6.2 %.',
+    ev:[['μ = 0.10','202.3 MPa'],['μ = 0.15 (baseline)','214.6 MPa'],['μ = 0.20','221.8 MPa'],['Spread','9.1 %']]}
+  ],
+  calcs:[
+   {n:'Factor of safety against yield',f:'FoS = S_y / σ_vm,max',
+    i:[['S_y (AA6061-T6)','276 MPa'],['σ_vm,max','214.6 MPa']],r:'1.29',u:'—',
+    a:'Yield-based, static loading, room temperature. No knock-down for surface finish or weld. Not valid where the peak is a mesh singularity.'},
+   {n:'Stress ratio at critical node',f:'R = σ_vm,max / S_y × 100',
+    i:[['σ_vm,max','214.6 MPa'],['S_y','276 MPa']],r:'77.8',u:'% of yield',
+    a:'Reported at node 48213. Compare against the programme limit of 80 % for primary structure.'},
+   {n:'Bolt joint slip margin',f:'F_slip = μ · n · F_pre',
+    i:[['μ','0.15'],['Bolts n','4'],['Pretension F_pre','21 000 N'],['Applied shear','4 812 N']],r:'12 600',u:'N (2.6× margin)',
+    a:'Assumes full pretension retained and a single friction interface per bolt. Embedding relaxation not modelled.'}
+  ]
+},
+{
+  id:'AER-207', geom:'carbody', domain:'CFD', name:'EV Aerodynamic Body',
+  type:'External flow · steady RANS · k-ω SST', solver:'ANSYS Fluent 2024 R2',
+  file:'aer_207_ext.cas/.dat', size:'3.1 GB', owner:'P. Kumar', run:'2026-09-17 22:08', wall:'04:37:11',
+  status:'warn', valid:'Passed with warnings', crit:0, warn:2,
+  mesh:{Nodes:'18 420 000',Elements:'42 610 000','Element type':'Poly-hexcore','Prism layers':'12','Average y+':'42.6','Max y+':'118','Max skewness':'0.84','Min orthogonal quality':'0.11'},
+  materials:[{n:'Air (incompressible, ideal gas off)',p:'ρ 1.225 kg/m³ · μ 1.7894e−5 Pa·s · T 20 °C'}],
+  bcs:[{n:'Velocity inlet',p:'27.78 m/s (100 km/h), I = 1 %, ℓ = 0.1 m'},{n:'Pressure outlet',p:'0 Pa gauge, backflow k-ω from neighbour'},
+       {n:'Moving ground',p:'27.78 m/s, no-slip'},{n:'Rotating wheels',p:'ω = 84.2 rad/s, MRF'},{n:'Symmetry',p:'Half model, z = 0 plane'}],
+  loads:[{n:'Turbulence model',p:'k-ω SST, curvature correction on'},{n:'Discretisation',p:'Second-order upwind (momentum, k, ω)'},{n:'Coupling',p:'Coupled pseudo-transient'}],
+  cases:['Baseline body','Rear spoiler +15 mm','Underbody tray'],
+  keyvals:[['Drag coefficient Cd','0.284'],['Lift coefficient Cl','−0.061'],['Drag force','292.7 N'],['Frontal area','2.18 m²']],
+  logs:[['22:08:04','INFO','Case + data loaded: aer_207_ext (42.6 M cells)'],['22:08:51','OK','Boundary condition set read — 5 zones'],
+        ['22:09:02','WARN','Max y+ = 118 exceeds the 100 target for wall-resolved SST'],['22:09:02','INFO','y+ above 30 on 94 % of wetted area — wall functions valid'],
+        ['22:09:18','WARN','Continuity residual plateaus at 8.4e−5 after iteration 980'],['22:09:19','OK','Monitored Cd stable within ±0.3 % over last 200 iterations'],
+        ['22:09:33','INFO','Mass imbalance 0.021 % of inlet flux'],['22:09:40','OK','Post-processing complete — 7 result variables available']],
+  plots:[
+    {t:'Scaled residuals',x:'Iteration',y:'log residual',log:true,
+     s:[{n:'continuity',d:[[0,-0.3],[100,-1.6],[200,-2.4],[400,-3.1],[600,-3.6],[800,-3.9],[1000,-4.05],[1240,-4.08]]},
+        {n:'x-velocity',d:[[0,-0.6],[100,-2.2],[200,-3.0],[400,-3.9],[600,-4.5],[800,-5.0],[1000,-5.3],[1240,-5.4]]},
+        {n:'k',d:[[0,-0.4],[100,-1.9],[200,-2.7],[400,-3.5],[600,-4.1],[800,-4.6],[1000,-4.9],[1240,-5.0]]}]},
+    {t:'Monitored drag coefficient',x:'Iteration',y:'Cd',s:[{n:'Cd',d:[[0,.62],[100,.41],[200,.336],[400,.301],[600,.291],[800,.2865],[1000,.2845],[1240,.284]]}]}
+  ],
+  diag:[
+   {sev:'warn',t:'Continuity residual plateau',loc:'Global · iterations 980–1240',
+    ev:[['Final continuity residual','8.4e−5'],['Target','1.0e−5'],['Plateau length','260 iterations'],['Cd drift over plateau','±0.3 %'],['Mass imbalance','0.021 %']],
+    cause:'Residual stalling with stable integrated quantities usually points to a small unsteady region — here the rear wake — rather than a diverging solution. Local cell quality (min orthogonality 0.11) in the wake block may also be limiting the floor.',
+    action:'Check whether the wake region is genuinely unsteady by running 0.5 s of URANS or SRS, and confirm that Cd and Cl stay inside ±1 %. Improve orthogonality in the wake refinement block before drawing conclusions from the residual level alone.'},
+   {sev:'warn',t:'Wall y+ above model target on part of the surface',loc:'Underbody and diffuser · 6 % of wetted area',
+    ev:[['Average y+','42.6'],['Max y+','118'],['Area above y+ 100','6 %'],['First-layer height','0.35 mm'],['Prism layers','12']],
+    cause:'The first cell height is coarse relative to the accelerated underbody flow, so the near-wall mesh drops out of the intended wall-function band in that region.',
+    action:'Re-mesh the underbody with a first-layer height near 0.22 mm, then compare Cd and the wall-shear distribution against this run.'},
+   {sev:'info',t:'Low orthogonal quality cells present',loc:'Wake refinement block · 812 cells',
+    ev:[['Min orthogonal quality','0.11'],['Cells below 0.15','812 (0.002 %)'],['Location','Wake, 1.2–2.4 m aft']],
+    cause:'A small number of poor cells at the interface between refinement levels.',
+    action:'Inspect the transition region and either smooth it or rebuild it with a single level jump.'}
+  ],
+  valid:[
+   {n:'Solver convergence',s:'warn',m:'Continuity residual plateaus at 8.4e−5, above the 1e−5 target, while monitors are stable.',
+    ev:[['Iterations','1 240'],['Continuity','8.4e−5'],['Momentum','4.0e−6'],['Cd variation, last 200 it.','±0.3 %'],['Target','1.0e−5']]},
+   {n:'Mass conservation',s:'pass',m:'Net mass imbalance is 0.021 % of the inlet flux.',
+    ev:[['Inlet mass flow','74.21 kg/s'],['Outlet mass flow','74.19 kg/s'],['Imbalance','0.021 %'],['Acceptance','< 0.1 %']]},
+   {n:'Mesh quality',s:'warn',m:'Max skewness 0.84 and 812 cells below 0.15 orthogonal quality.',
+    ev:[['Max skewness','0.84'],['Cells > 0.8 skew','1 240'],['Min orthogonal quality','0.11'],['Acceptance skew','< 0.85']]},
+   {n:'y+ compliance',s:'warn',m:'6 % of the wetted area sits above the y+ 100 band assumed by the wall treatment.',
+    ev:[['Average y+','42.6'],['Max y+','118'],['Target band','30 – 100'],['Area outside band','6 %']]},
+   {n:'Experimental comparison',s:'pass',m:'Wind-tunnel Cd for the same body is 0.291; the simulation is 2.4 % low.',
+    ev:[['Tunnel Cd (sample data)','0.291'],['CFD Cd','0.284'],['Difference','−2.4 %'],['Acceptance band','±5 %']]},
+   {n:'Domain size check',s:'pass',m:'Blockage ratio 1.2 %, outlet 8 body lengths downstream.',
+    ev:[['Blockage ratio','1.2 %'],['Upstream length','3 L'],['Downstream length','8 L'],['Guideline','< 5 % blockage']]}
+  ],
+  calcs:[
+   {n:'Reynolds number',f:'Re = ρ · V · L / μ',
+    i:[['ρ','1.225 kg/m³'],['V','27.78 m/s'],['L (wheelbase ref.)','4.20 m'],['μ','1.7894e−5 Pa·s']],r:'7.99 × 10⁶',u:'—',
+    a:'Reference length taken as the wheelbase. Fully turbulent boundary layer assumed from the front fascia.'},
+   {n:'Drag force',f:'F_d = ½ · ρ · V² · A · C_d',
+    i:[['ρ','1.225 kg/m³'],['V','27.78 m/s'],['A','2.18 m²'],['C_d','0.284']],r:'292.7',u:'N',
+    a:'Half model result doubled. Excludes wheel-rotation losses outside the MRF zone and any cooling-flow drag.'},
+   {n:'Pressure coefficient at probe',f:'C_p = (p − p_∞) / (½ · ρ · V²)',
+    i:[['p (probe P1)','486 Pa'],['p_∞','0 Pa gauge'],['½ρV²','472.7 Pa']],r:'1.028',u:'—',
+    a:'Values above 1.0 by 2.8 % indicate the probe sits marginally inside the stagnation cell; refine locally before quoting.'},
+   {n:'Aerodynamic power at 100 km/h',f:'P = F_d · V',
+    i:[['F_d','292.7 N'],['V','27.78 m/s']],r:'8.13',u:'kW',
+    a:'Aerodynamic component only — rolling resistance and driveline losses are not included.'}
+  ]
+},
+{
+  id:'THM-088', geom:'coldplate', domain:'Thermal', name:'Battery Cooling Plate',
+  type:'Conjugate heat transfer · steady', solver:'ANSYS Fluent 2024 R2 (CHT)',
+  file:'thm_088_cht.dat', size:'1.4 GB', owner:'P. Kumar', run:'2026-09-18 14:02', wall:'01:52:40',
+  status:'crit', valid:'Requires investigation', crit:1, warn:1,
+  mesh:{Nodes:'6 210 000',Elements:'11 840 000','Element type':'Poly + hex channel','Solid/fluid interfaces':'2','Average quality':'0.79','Max skewness':'0.72','Prism layers (fluid)':'8'},
+  materials:[{n:'AA3003 plate',p:'k 155 W/m·K · ρ 2730 kg/m³ · cp 893 J/kg·K'},
+             {n:'50/50 water-glycol',p:'ρ 1050 kg/m³ · cp 3300 J/kg·K · k 0.39 W/m·K · μ 0.0032 Pa·s'},
+             {n:'Thermal interface pad',p:'k 3.2 W/m·K · thickness 0.5 mm'}],
+  bcs:[{n:'Inlet',p:'6 L/min, 25 °C'},{n:'Outlet',p:'0 Pa gauge'},{n:'Cell heat load',p:'8 × 230 W footprint sources'},{n:'External walls',p:'h = 8 W/m²·K, 25 °C ambient'}],
+  loads:[{n:'Total heat load',p:'1 840 W'},{n:'Flow regime',p:'Re_channel = 1 960 (laminar)'}],
+  cases:['6 L/min baseline','9 L/min','Reversed flow direction'],
+  keyvals:[['Max cell temperature','58.3 °C'],['Cell-to-cell spread','11.4 K'],['Coolant Δt','5.3 K'],['Pressure drop','18.6 kPa']],
+  logs:[['14:02:11','INFO','CHT case loaded — 2 solid/fluid interfaces'],['14:02:44','OK','Energy balance: in 1 840 W / out 1 836 W'],
+        ['14:03:02','ERROR','Max cell temperature 58.3 °C exceeds the 55 °C design limit'],['14:03:03','WARN','Cell-to-cell spread 11.4 K exceeds the 5 K uniformity target'],
+        ['14:03:15','INFO','Channel Reynolds number 1 960 — laminar correlation applied'],['14:03:22','OK','Post-processing complete — 4 result variables available']],
+  plots:[
+    {t:'Temperature along flow path',x:'Path length (mm)',y:'°C',s:[{n:'Coolant',d:[[0,25],[120,26.4],[240,27.6],[360,28.7],[480,29.6],[600,30.3]]},{n:'Plate surface',d:[[0,38.2],[120,43.1],[240,47.9],[360,52.4],[480,56.1],[600,58.3]]}]},
+    {t:'Cell temperature distribution',x:'Cell index',y:'°C',s:[{n:'Max cell T',d:[[1,46.9],[2,48.8],[3,50.6],[4,52.2],[5,54.1],[6,56.0],[7,57.4],[8,58.3]]}]}
+  ],
+  diag:[
+   {sev:'crit',t:'Peak cell temperature above design limit',loc:'Cell 8 footprint · outlet end of plate · (52.1, 3.0, −18.4) mm',
+    ev:[['Max plate temperature','58.3 °C'],['Design limit','55.0 °C'],['Exceedance','+3.3 K'],['Area above limit','1 840 mm² (4.1 % of footprint)'],['Local heat flux','42.6 kW/m²']],
+    cause:'Coolant enters the last pass already warmed by 5.3 K, so the driving temperature difference at the outlet end is the smallest on the plate while the heat flux is unchanged. Flow maldistribution between passes may add to this.',
+    action:'Quantify the per-pass flow split from the mass-flow report, then test the 9 L/min case and the reversed-flow case already in this project. If the split is uneven, evaluate the inlet manifold before changing flow rate.'},
+   {sev:'warn',t:'Cell-to-cell temperature spread above target',loc:'Cells 1 → 8 · full plate',
+    ev:[['Coolest cell','46.9 °C'],['Hottest cell','58.3 °C'],['Spread','11.4 K'],['Uniformity target','5.0 K']],
+    cause:'A single-direction serpentine path produces a monotonic rise from inlet to outlet, which is the expected behaviour for this layout rather than a numerical artefact.',
+    action:'Compare against a counter-flow or U-turn manifold layout, and check the pack ageing requirement that sets the 5 K target.'},
+   {sev:'info',t:'Small energy imbalance',loc:'Global energy balance',
+    ev:[['Heat in','1 840 W'],['Heat out','1 836 W'],['Imbalance','0.22 %'],['Acceptance','< 1 %']],
+    cause:'Residual imbalance consistent with a converged CHT solution.',action:'No action; recorded for the report appendix.'}
+  ],
+  valid:[
+   {n:'Energy balance',s:'pass',m:'Heat out matches heat in to 0.22 %.',ev:[['Heat in','1 840 W'],['Heat out','1 836 W'],['Imbalance','0.22 %'],['Acceptance','< 1 %']]},
+   {n:'Solver convergence',s:'pass',m:'Energy residual 3.1e−8; monitored outlet temperature flat over 300 iterations.',
+    ev:[['Energy residual','3.1e−8'],['Continuity','6.2e−6'],['Outlet T drift','< 0.01 K']]},
+   {n:'Analytical comparison',s:'pass',m:'Coolant temperature rise from Q = ṁ·cp·ΔT agrees within 1.9 %.',
+    ev:[['Hand calculation ΔT','5.40 K'],['CFD ΔT','5.30 K'],['Difference','1.9 %'],['Acceptance','±10 %']]},
+   {n:'Design limit check',s:'crit',m:'Peak temperature exceeds the 55 °C limit by 3.3 K.',
+    ev:[['Max T','58.3 °C'],['Limit','55.0 °C'],['Exceedance','+3.3 K'],['Area above limit','4.1 % of footprint']]},
+   {n:'Mesh convergence',s:'warn',m:'Only two refinement levels available; peak temperature moved 1.4 K between them.',
+    ev:[['Level 1 (3.1 M)','56.9 °C'],['Level 2 (6.2 M)','58.3 °C'],['Δ','1.4 K'],['Levels required','≥ 3']]},
+   {n:'Unit consistency',s:'pass',m:'SI units consistent across solid and fluid zones.',ev:[['Temperature','K internally, °C displayed'],['Power','W'],['Flow','kg/s']]}
+  ],
+  calcs:[
+   {n:'Coolant temperature rise',f:'ΔT = Q / (ṁ · c_p)',
+    i:[['Q','1 840 W'],['ṁ','0.105 kg/s'],['c_p','3 300 J/kg·K']],r:'5.31',u:'K',
+    a:'Assumes all cell heat enters the coolant and constant properties between 25 °C and 31 °C.'},
+   {n:'Channel Reynolds number',f:'Re = ρ · v · D_h / μ',
+    i:[['ρ','1 050 kg/m³'],['v','0.42 m/s'],['D_h','0.0142 m'],['μ','0.0032 Pa·s']],r:'1 957',u:'— (laminar)',
+    a:'Below the 2 300 transition value, so laminar correlations apply. Entrance effects not corrected.'},
+   {n:'Convective heat transfer coefficient',f:'h = Nu · k / D_h   (Nu = 4.36, constant q″)',
+    i:[['Nu','4.36'],['k','0.39 W/m·K'],['D_h','0.0142 m']],r:'119.7',u:'W/m²·K',
+    a:'Fully developed laminar flow in a constant heat-flux duct. The CFD-reported local h reaches 4 260 W/m²·K at turn regions where this correlation does not apply.'},
+   {n:'Thermal resistance, cell to coolant',f:'R_th = (T_cell,max − T_coolant,in) / Q_cell',
+    i:[['T_cell,max','58.3 °C'],['T_coolant,in','25.0 °C'],['Q_cell','230 W']],r:'0.145',u:'K/W',
+    a:'Lumped path resistance including the 0.5 mm interface pad. Contact resistance at the pad interface is assumed ideal.'}
+  ]
+},
+{
+  id:'MBD-052', geom:'suspension', domain:'MBD', name:'Vehicle Suspension — Double Wishbone',
+  type:'Rigid multibody dynamics · transient', solver:'MSC Adams / Car 2024.1',
+  file:'mbd_052_ride.res', size:'214 MB', owner:'P. Kumar', run:'2026-09-15 17:20', wall:'00:04:12',
+  status:'pass', valid:'Passed with warnings', crit:0, warn:1,
+  mesh:{Bodies:'9',Joints:'11','Force elements':'4','Degrees of freedom':'2','Integrator':'GSTIFF I3','Time step':'1.0e−3 s','Simulated time':'2.0 s'},
+  materials:[{n:'Rigid bodies',p:'Mass + inertia tensor per body, no flexibility'},{n:'Spring',p:'k = 32 N/mm, free length 260 mm'},{n:'Damper',p:'Bump 2 400 N·s/m, rebound 3 600 N·s/m'}],
+  bcs:[{n:'Ground constraints',p:'Chassis pick-up points fixed to ground part'},{n:'Revolute joints',p:'Upper and lower arm inboard, 4 total'},{n:'Spherical joints',p:'Ball joints, 2 total'},{n:'Translational joint',p:'Damper rod'}],
+  loads:[{n:'Road input',p:'Swept sine, 0.5 → 12 Hz, 25 mm amplitude'},{n:'Corner mass',p:'412 kg sprung + 48 kg unsprung'},{n:'Gravity',p:'9 806.6 mm/s², −Y'}],
+  cases:['Swept sine ride','Single 60 mm bump','Steady-state cornering 0.6 g'],
+  keyvals:[['Max wheel travel','78.2 mm'],['Peak vertical acceleration','12.4 m/s²'],['Max joint force','6 842 N'],['Camber change','−1.8°']],
+  logs:[['17:20:03','INFO','Model assembled — 9 bodies, 11 joints, 2 DOF'],['17:20:04','OK','Gruebler count consistent with expected DOF'],
+        ['17:20:08','INFO','Transient run 0 → 2.0 s, GSTIFF I3'],['17:20:59','WARN','Peak force at lower ball joint J3 within 8 % of the 7 400 N component rating'],
+        ['17:21:14','OK','No joint lock-up or redundant constraint detected'],['17:21:20','OK','Post-processing complete — 4 result variables available']],
+  plots:[
+    {t:'Wheel centre vertical displacement',x:'Time (s)',y:'mm',s:[{n:'Displacement',d:[[0,0],[.2,34],[.4,-28],[.6,58],[.8,-46],[1.0,72],[1.2,-61],[1.4,78.2],[1.6,-54],[1.8,41],[2.0,-22]]}]},
+    {t:'Lower ball joint reaction force',x:'Time (s)',y:'N',s:[{n:'|F| at J3',d:[[0,2210],[.2,3420],[.4,2980],[.6,4610],[.8,4120],[1.0,5840],[1.2,5210],[1.4,6842],[1.6,5320],[1.8,4180],[2.0,3010]]}]}
+  ],
+  diag:[
+   {sev:'warn',t:'Joint force approaching component rating',loc:'Lower ball joint J3 · t = 1.42 s',
+    ev:[['Peak |F|','6 842 N'],['Component rating','7 400 N'],['Utilisation','92.5 %'],['Excitation frequency at peak','8.6 Hz'],['Duty cycle above 6 000 N','0.14 s of 2.0 s']],
+    cause:'The peak coincides with the 8.6 Hz wheel-hop region of the swept input, where unsprung mass response amplifies the load path through the lower arm.',
+    action:'Run the single-bump and cornering cases already defined in this project to see whether 8.6 Hz is the governing condition, and compare the duty cycle against the ball-joint supplier S-N data.'},
+   {sev:'info',t:'Two degrees of freedom confirmed',loc:'Global topology',
+    ev:[['Bodies','9'],['Joints','11'],['Computed DOF','2'],['Expected DOF','2 (wheel travel + steering hold)']],
+    cause:'Topology matches the intended double-wishbone arrangement with no redundant constraints.',action:'None.'}
+  ],
+  valid:[
+   {n:'Constraint consistency',s:'pass',m:'Computed DOF matches the expected 2; no redundant constraints reported.',
+    ev:[['Bodies','9'],['Joints','11'],['Computed DOF','2'],['Redundant constraints','0']]},
+   {n:'Integrator convergence',s:'pass',m:'No step-size collapse; minimum step stayed above 1e−5 s.',
+    ev:[['Integrator','GSTIFF I3'],['Nominal step','1.0e−3 s'],['Minimum step','4.2e−5 s'],['Corrector failures','0']]},
+   {n:'Energy check',s:'pass',m:'Damper dissipation accounts for 98.6 % of the input work.',
+    ev:[['Input work','1 284 J'],['Damper dissipation','1 266 J'],['Unaccounted','1.4 %']]},
+   {n:'Kinematic envelope',s:'warn',m:'Peak wheel travel 78.2 mm is within 2.3 % of the 80 mm bump-stop clearance.',
+    ev:[['Max travel','78.2 mm'],['Bump-stop clearance','80.0 mm'],['Margin','1.8 mm']]},
+   {n:'Experimental comparison',s:'idle',m:'No rig data linked to this simulation.',ev:[['K&C rig data','Not uploaded']]}
+  ],
+  calcs:[
+   {n:'Motion ratio',f:'MR = Δx_spring / Δx_wheel',
+    i:[['Spring travel','46.9 mm'],['Wheel travel','78.2 mm']],r:'0.600',u:'—',
+    a:'Evaluated at peak travel. Treated as constant, though the true ratio varies slightly through the stroke.'},
+   {n:'Wheel rate',f:'k_w = k_s · MR²',
+    i:[['Spring rate k_s','32 N/mm'],['Motion ratio','0.600']],r:'11.52',u:'N/mm',
+    a:'Rigid links and frictionless joints. Tyre vertical stiffness is not included.'},
+   {n:'Ride frequency',f:'f = (1 / 2π) · √(k_w / m_s)',
+    i:[['k_w','11 520 N/m'],['Sprung mass m_s','412 kg']],r:'0.842',u:'Hz',
+    a:'Quarter-car idealisation at one corner, undamped natural frequency.'},
+   {n:'Ball joint utilisation',f:'Util = F_max / F_rated × 100',
+    i:[['F_max','6 842 N'],['F_rated','7 400 N']],r:'92.5',u:'%',
+    a:'Static rating comparison only; fatigue duty is assessed separately against supplier S-N data.'}
+  ]
+}
+];
+const P=id=>PROJECTS.find(p=>p.id===id);
+const STATUS_LABEL={pass:'Verified',warn:'Passed with warnings',crit:'Requires investigation',idle:'Not validated'};
+</script>
+<script>
+/* ============================================================
+   Geometry builders + WebGL result viewer
+   ============================================================ */
+const T=window.THREE;
+function box(w,h,d,a,b,c){return new T.BoxGeometry(w,h,d,a||8,b||6,c||6);}
+function cyl(r1,r2,h,s){return new T.CylinderGeometry(r1,r2,h,s||20,4);}
+
+const GEOMS={
+ bracket(){
+  const p=[];
+  p.push({n:'Base plate',g:box(90,8,60,30,4,20),pos:[0,-16,0]});
+  p.push({n:'Vertical flange',g:box(8,70,60,4,26,20),pos:[-41,15,0]});
+  p.push({n:'Rib, +Z',g:box(5,40,34,3,14,12),pos:[-26,-2,18],rot:[0,0,-0.42]});
+  p.push({n:'Rib, −Z',g:box(5,40,34,3,14,12),pos:[-26,-2,-18],rot:[0,0,-0.42]});
+  [[36,24],[36,-24],[-6,24],[-6,-24]].forEach((c,i)=>p.push({n:'Bolt boss '+(i+1),g:cyl(8,8,10,22),pos:[c[0],-15,c[1]]}));
+  p.push({n:'Chassis rail (contact)',g:box(120,10,80,20,2,14),pos:[6,-25,0],fixed:true});
+  return {parts:p,up:60,scale:1};
+ },
+ carbody(){
+  const p=[];
+  const b=new T.SphereGeometry(1,60,36); b.scale(2.15,.52,.86);
+  p.push({n:'Body shell',g:b,pos:[0,.58,0]});
+  const c=new T.SphereGeometry(1,44,28); c.scale(1.05,.42,.72);
+  p.push({n:'Cabin / greenhouse',g:c,pos:[-.1,.92,0]});
+  const n=box(1.5,.28,1.5,10,3,10); p.push({n:'Front fascia',g:n,pos:[1.55,.42,0]});
+  [[1.35,.62],[1.35,-.62],[-1.35,.62],[-1.35,-.62]].forEach((w,i)=>{
+    const g=cyl(.35,.35,.22,26); g.rotateX(Math.PI/2);
+    p.push({n:'Wheel '+(i+1),g,pos:[w[0],.35,w[1]],fixed:true});
+  });
+  p.push({n:'Moving ground',g:box(9,.04,4,18,1,10),pos:[0,.19,0],fixed:true});
+  return {parts:p,up:1.4,scale:1};
+ },
+ coldplate(){
+  const p=[]; p.push({n:'Plate, AA3003',g:box(120,6,80,54,3,36),pos:[0,0,0]});
+  [-28,-9,9,28].forEach((z,i)=>{const g=cyl(4,4,104,18); g.rotateZ(Math.PI/2);
+    p.push({n:'Channel pass '+(i+1),g,pos:[0,0,z]});});
+  [[52,-18.5],[-52,.5],[52,18.5]].forEach((t,i)=>{const g=new T.TorusGeometry(9.5,4,10,24,Math.PI);
+    g.rotateX(Math.PI/2); g.rotateZ(i===1?-Math.PI/2:Math.PI/2);
+    p.push({n:'Return bend '+(i+1),g,pos:[t[0],0,t[1]]});});
+  for(let i=0;i<8;i++) p.push({n:'Cell '+(i+1)+' footprint',g:box(24,3,32,6,1,8),pos:[-52+i*15,4.4,0],fixed:true});
+  return {parts:p,up:70,scale:1};
+ },
+ suspension(){
+  const p=[];
+  p.push({n:'Chassis mount',g:box(16,48,14,4,10,4),pos:[-52,4,0],fixed:true});
+  const la=box(62,7,9,16,2,3); p.push({n:'Lower control arm',g:la,pos:[-14,-24,0],pivot:[-45,-24,0],anim:'arm',amp:.16});
+  const ua=box(46,6,8,14,2,3); p.push({n:'Upper control arm',g:ua,pos:[-20,16,0],pivot:[-44,16,0],anim:'arm',amp:.19});
+  p.push({n:'Upright / knuckle',g:box(11,50,12,3,12,3),pos:[16,-4,0],anim:'knuckle',amp:9});
+  const wh=cyl(30,30,16,30); wh.rotateZ(Math.PI/2);
+  p.push({n:'Wheel & tyre',g:wh,pos:[34,-4,0],anim:'knuckle',amp:9});
+  const dm=cyl(5,5,54,16); dm.rotateZ(.28); p.push({n:'Damper',g:dm,pos:[-6,6,0],anim:'damper',amp:5});
+  const sp=cyl(12,12,44,20,1,true); sp.rotateZ(.28); p.push({n:'Coil spring',g:sp,pos:[-6,6,0],anim:'damper',amp:5});
+  p.push({n:'Tie rod',g:box(38,5,5,10,2,2),pos:[-2,-12,10],anim:'arm',amp:.08,pivot:[-24,-12,10]});
+  p.push({n:'Ground / road',g:box(120,4,70,16,1,10),pos:[20,-40,0],fixed:true});
+  return {parts:p,up:60,scale:1};
+ }
+};
+const DEFORM={
+  bracket:(x,y,z,f)=>[ -f*3.2, -f*9, f*z*0.02 ],
+  carbody:()=>[0,0,0], coldplate:(x,y,z,f)=>[0,f*.6,0], suspension:()=>[0,0,0]
+};
+
+class Viewer{
+  constructor(canvas,opts){
+    this.c=canvas; this.opts=opts||{};
+    this.renderer=new T.WebGLRenderer({canvas,antialias:true,alpha:true});
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+    this.renderer.localClippingEnabled=true;
+    this.scene=new T.Scene();
+    this.cam=new T.PerspectiveCamera(38,1,.01,10000);
+    this.group=new T.Group(); this.scene.add(this.group);
+    this.scene.add(new T.HemisphereLight(0xdfe9f2,0x30404d,.85));
+    const d=new T.DirectionalLight(0xffffff,.72); d.position.set(1,1.6,1.2); this.scene.add(d);
+    const d2=new T.DirectionalLight(0xffffff,.3); d2.position.set(-1.2,-.4,-1); this.scene.add(d2);
+    this.plane=new T.Plane(new T.Vector3(-1,0,0),0);
+    this.state={cmap:'jet',t:0,deform:0,wire:false,transp:false,clip:false,clipPos:.5,edges:true,axis:'x',range:null};
+    this.target=new T.Vector3(); this.sph={r:260,th:.9,ph:1.05};
+    this.probes=[]; this.parts=[];
+    this._bind(); this._loop();
+    if(window.ResizeObserver){this.ro=new ResizeObserver(()=>this.resize()); this.ro.observe(canvas.parentElement||canvas);}
+  }
+  load(key,vars){
+    this.group.clear(); this.parts=[]; this.geomKey=key;
+    const def=GEOMS[key](); this.up=def.up;
+    def.parts.forEach(pd=>{
+      const g=pd.g; g.computeVertexNormals();
+      const n=g.attributes.position.count;
+      g.setAttribute('color',new T.BufferAttribute(new Float32Array(n*3),3));
+      g.userData.base=Float32Array.from(g.attributes.position.array);
+      const m=new T.MeshStandardMaterial({vertexColors:true,metalness:.08,roughness:.72,side:T.DoubleSide,
+        clippingPlanes:[],flatShading:false});
+      const mesh=new T.Mesh(g,m);
+      mesh.position.set(...(pd.pos||[0,0,0]));
+      if(pd.rot)mesh.rotation.set(...pd.rot);
+      const rec={name:pd.n,mesh,mat:m,fixed:!!pd.fixed,anim:pd.anim,amp:pd.amp||0,
+        pivot:pd.pivot,pos:(pd.pos||[0,0,0]).slice(),visible:true,geo:g};
+      if(pd.pivot){ // shift geometry so the pivot sits at the mesh origin
+        const off=[pd.pos[0]-pd.pivot[0],pd.pos[1]-pd.pivot[1],pd.pos[2]-pd.pivot[2]];
+        g.translate(off[0],off[1],off[2]); g.userData.base=Float32Array.from(g.attributes.position.array);
+        mesh.position.set(...pd.pivot);
+      }
+      this.parts.push(rec); this.group.add(mesh);
+    });
+    this.box=new T.Box3().setFromObject(this.group);
+    this.box.getCenter(this.target);
+    this.radius=this.box.getSize(new T.Vector3()).length()/2;
+    this.sph.r=this.radius*2.6;
+    this.edgesOn(this.state.edges);
+  }
+  edgesOn(on){
+    this.state.edges=on;
+    this.parts.forEach(p=>{
+      if(p.edge){p.mesh.remove(p.edge); p.edge.geometry.dispose(); p.edge=null;}
+      if(on&&!p.fixed){
+        const e=new T.LineSegments(new T.EdgesGeometry(p.geo,32),
+          new T.LineBasicMaterial({color:0x0b1116,transparent:true,opacity:.28}));
+        p.mesh.add(e); p.edge=e;
+      }
+    });
+  }
+  paint(vr){
+    this.vr=vr||this.vr; const v=this.vr; if(!v)return;
+    const t=this.state.t, key=this.geomKey, dfn=DEFORM[key];
+    const rng=this.state.range||[0,1];
+    this.parts.forEach(p=>{
+      const g=p.geo, pos=g.attributes.position, col=g.attributes.color, base=g.userData.base;
+      const o=p.pivot?p.pivot:p.pos;
+      for(let i=0;i<pos.count;i++){
+        const bx=base[i*3],by=base[i*3+1],bz=base[i*3+2];
+        const wx=bx+o[0], wy=by+o[1], wz=bz+o[2];
+        let f=p.fixed?0:v.f(wx,wy,wz,t); f=Math.max(0,Math.min(1,f));
+        let n=(f-rng[0])/((rng[1]-rng[0])||1); n=Math.max(0,Math.min(1,n));
+        let c;
+        if(p.fixed){c=[92,104,114];}
+        else c=cmap(this.state.cmap,n);
+        col.array[i*3]=c[0]/255; col.array[i*3+1]=c[1]/255; col.array[i*3+2]=c[2]/255;
+        if(this.state.deform>0&&!p.fixed){
+          const d=dfn(wx,wy,wz,f), s=this.state.deform;
+          pos.array[i*3]=bx+d[0]*s; pos.array[i*3+1]=by+d[1]*s; pos.array[i*3+2]=bz+d[2]*s;
+        }else{pos.array[i*3]=bx;pos.array[i*3+1]=by;pos.array[i*3+2]=bz;}
+      }
+      col.needsUpdate=true; pos.needsUpdate=true; g.computeVertexNormals();
+    });
+    this.applyStyle(); this.animParts();
+  }
+  animParts(){
+    const t=this.state.t;
+    this.parts.forEach(p=>{
+      if(p.anim==='arm')p.mesh.rotation.z=Math.sin(t*6.283)*p.amp;
+      if(p.anim==='knuckle')p.mesh.position.y=p.pos[1]+Math.sin(t*6.283)*p.amp;
+      if(p.anim==='damper')p.mesh.scale.y=1-Math.sin(t*6.283)*.12;
+    });
+  }
+  applyStyle(){
+    const s=this.state;
+    this.plane.normal.set(s.axis==='x'?-1:0,s.axis==='y'?-1:0,s.axis==='z'?-1:0);
+    const ext=s.axis==='x'?[this.box.min.x,this.box.max.x]:s.axis==='y'?[this.box.min.y,this.box.max.y]:[this.box.min.z,this.box.max.z];
+    this.plane.constant=ext[0]+(ext[1]-ext[0])*s.clipPos;
+    this.parts.forEach(p=>{
+      p.mat.wireframe=s.wire;
+      p.mat.transparent=s.transp||p.fixed;
+      p.mat.opacity=p.fixed?(s.transp?.12:.3):(s.transp?.42:1);
+      p.mat.clippingPlanes=s.clip?[this.plane]:[];
+      p.mat.needsUpdate=true;
+      p.mesh.visible=p.visible;
+      if(p.edge)p.edge.visible=s.edges&&!s.wire&&p.visible;
+    });
+  }
+  fit(){ if(!this.box)return; this.box.getCenter(this.target); this.sph.r=this.radius*2.6; }
+  view(name){
+    const v={iso:[.9,1.05],front:[0,1.5708],top:[0,.01],right:[1.5708,1.5708],left:[-1.5708,1.5708]}[name]||[.9,1.05];
+    this.sph.th=v[0]; this.sph.ph=v[1];
+  }
+  resize(){
+    const r=(this.c.parentElement||this.c).getBoundingClientRect();
+    if(!r.width||!r.height)return;
+    this.renderer.setSize(r.width,r.height,false);
+    this.cam.aspect=r.width/r.height; this.cam.updateProjectionMatrix();
+  }
+  addProbe(pt,val,unit){
+    const g=new T.SphereGeometry(this.radius*.018,12,10);
+    const m=new T.MeshBasicMaterial({color:0xffffff});
+    const s=new T.Mesh(g,m); s.position.copy(pt); this.scene.add(s);
+    this.probes.push({mesh:s,val,unit,pt});
+    return this.probes.length;
+  }
+  clearProbes(){this.probes.forEach(p=>this.scene.remove(p.mesh)); this.probes=[];}
+  _bind(){
+    const c=this.c; let drag=null;
+    c.addEventListener('pointerdown',e=>{
+      c.setPointerCapture(e.pointerId);
+      drag={x:e.clientX,y:e.clientY,pan:e.button===2||e.shiftKey,moved:0};
+    });
+    c.addEventListener('contextmenu',e=>e.preventDefault());
+    c.addEventListener('pointermove',e=>{
+      if(this.opts.onHover)this.opts.onHover(e,this);
+      if(!drag)return;
+      const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.x=e.clientX; drag.y=e.clientY;
+      drag.moved+=Math.abs(dx)+Math.abs(dy);
+      if(drag.pan){
+        const f=this.sph.r*.0018;
+        const right=new T.Vector3().setFromMatrixColumn(this.cam.matrix,0);
+        const up=new T.Vector3().setFromMatrixColumn(this.cam.matrix,1);
+        this.target.addScaledVector(right,-dx*f).addScaledVector(up,dy*f);
+      }else{
+        this.sph.th-=dx*.008; this.sph.ph=Math.max(.05,Math.min(Math.PI-.05,this.sph.ph-dy*.008));
+      }
+    });
+    c.addEventListener('pointerup',e=>{
+      if(drag&&drag.moved<4&&this.opts.onClick)this.opts.onClick(e,this);
+      drag=null;
+    });
+    c.addEventListener('wheel',e=>{e.preventDefault(); this.sph.r*=(1+Math.sign(e.deltaY)*.11);
+      this.sph.r=Math.max(this.radius*.35,Math.min(this.radius*14,this.sph.r));},{passive:false});
+  }
+  pick(e){
+    const r=this.c.getBoundingClientRect();
+    const m=new T.Vector2(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1);
+    const rc=new T.Raycaster(); rc.setFromCamera(m,this.cam);
+    const hits=rc.intersectObjects(this.parts.filter(p=>p.visible&&!p.fixed).map(p=>p.mesh),false);
+    return hits[0]||null;
+  }
+  valueAt(pt){
+    if(!this.vr)return null;
+    const f=Math.max(0,Math.min(1,this.vr.f(pt.x,pt.y,pt.z,this.state.t)));
+    return this.vr.min+(this.vr.max-this.vr.min)*f;
+  }
+  _loop(){
+    const step=()=>{
+      if(this.dead)return;
+      requestAnimationFrame(step);
+      const s=this.sph;
+      this.cam.position.set(
+        this.target.x+s.r*Math.sin(s.ph)*Math.sin(s.th),
+        this.target.y+s.r*Math.cos(s.ph),
+        this.target.z+s.r*Math.sin(s.ph)*Math.cos(s.th));
+      this.cam.lookAt(this.target);
+      this.renderer.render(this.scene,this.cam);
+    };
+    step();
+  }
+}
+
+/* ---------- small SVG plotting ---------- */
+function plot(p,h){
+  h=h||150; const W=560,H=h,L=46,R=12,Tp=20,B=26;
+  const all=p.s.flatMap(s=>s.d);
+  const xs=all.map(d=>d[0]), ys=all.map(d=>d[1]);
+  let x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const pad=(y1-y0)*.12||1; y0-=pad; y1+=pad;
+  const X=v=>L+(v-x0)/((x1-x0)||1)*(W-L-R), Y=v=>Tp+(1-(v-y0)/((y1-y0)||1))*(H-Tp-B);
+  const cols=['var(--accent)','var(--warn)','var(--pass)','var(--crit)'];
+  let g='';
+  for(let i=0;i<=4;i++){const yy=Tp+i*(H-Tp-B)/4, val=y1-(y1-y0)*i/4;
+    g+=`<line class="gl" x1="${L}" y1="${yy}" x2="${W-R}" y2="${yy}"/><text x="${L-6}" y="${yy+3}" text-anchor="end">${U.n(val,Math.abs(val)<10?2:0)}</text>`;}
+  for(let i=0;i<=4;i++){const xx=L+i*(W-L-R)/4, val=x0+(x1-x0)*i/4;
+    g+=`<text x="${xx}" y="${H-9}" text-anchor="middle">${U.n(val,Math.abs(val)<10?1:0)}</text>`;}
+  const lines=p.s.map((s,i)=>{
+    const d=s.d.map((pt,j)=>(j?'L':'M')+X(pt[0]).toFixed(1)+' '+Y(pt[1]).toFixed(1)).join(' ');
+    return `<path d="${d}" fill="none" stroke="${cols[i%4]}" stroke-width="1.6"/>`+
+      s.d.map(pt=>`<circle cx="${X(pt[0]).toFixed(1)}" cy="${Y(pt[1]).toFixed(1)}" r="2" fill="${cols[i%4]}"/>`).join('');
+  }).join('');
+  const leg=p.s.map((s,i)=>`<g transform="translate(${L+i*112},${Tp-8})"><rect width="9" height="2.5" y="-3" fill="${cols[i%4]}"/><text x="13" y="0">${s.n}</text></g>`).join('');
+  return `<svg class="plot" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+   <text class="ttl" x="${L-40}" y="11">${p.t}</text>
+   <line class="ax" x1="${L}" y1="${Tp}" x2="${L}" y2="${H-B}"/><line class="ax" x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}"/>
+   ${g}${lines}${leg}
+   <text x="${W-R}" y="${H-9}" text-anchor="end">${p.x}</text>
+   <text x="${L-40}" y="${H-B+12}">${p.y}</text></svg>`;
+}
+</script>
+<script>
+/* ============================================================
+   Application shell
+   ============================================================ */
+const ROUTES=[
+ {g:'Workspace'},
+ {id:'home',n:'Home',i:'home'},{id:'projects',n:'Projects',i:'folder'},{id:'simulations',n:'Simulations',i:'sim'},
+ {g:'Result domains'},
+ {id:'fea',n:'FEA',i:'fea',proj:'BRK-114'},{id:'cfd',n:'CFD',i:'cfd',proj:'AER-207'},
+ {id:'thermal',n:'Thermal',i:'th',proj:'THM-088'},{id:'mbd',n:'MBD',i:'mbd',proj:'MBD-052'},
+ {id:'multiphysics',n:'Multiphysics',i:'multi'},
+ {g:'Analysis'},
+ {id:'comparison',n:'Comparison',i:'cmp'},{id:'validation',n:'Validation',i:'val'},
+ {id:'diagnostics',n:'Diagnostics',i:'diag'},{id:'assistant',n:'AI Engineering Assistant',i:'ai'},
+ {id:'optimization',n:'Optimization',i:'opt'},
+ {g:'Output'},
+ {id:'reports',n:'Reports',i:'rep'},{id:'data',n:'Data & Files',i:'data'},{id:'settings',n:'Settings',i:'set'}
+];
+const ST={view:'home',proj:'BRK-114',varId:'vonmises',tab:0,dock:'plots',rtab:'props',mode:null};
+let VIEWER=null, wsEl=null;
+
+const app=U.q('#app');
+app.innerHTML=`
+<header class="cmdbar">
+  <div class="brand">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
+      <path d="M12 2.5 21 7v10l-9 4.5L3 17V7Z"/><path d="M3 7l9 4.5L21 7M12 11.5V21.5" stroke-opacity=".5"/>
+    </svg>
+    <div><b>CAE Results Analyzer</b><br><span>post-processing · v0.9 demo</span></div>
+  </div>
+  <div class="cmd-actions">
+    <button class="cmd" data-act="import">Import simulation</button>
+    <button class="cmd" data-act="open">Open project</button>
+    <button class="cmd" data-act="compare">Compare</button>
+    <button class="cmd" data-act="validate">Run validation</button>
+    <button class="cmd" data-act="report">Generate report</button>
+  </div>
+  <div class="cmd-right">
+    <div class="ctx" id="ctx"></div>
+    <button class="iconbtn" id="themeBtn" title="Switch theme">${svgi('M8 1.6a6.4 6.4 0 1 0 0 12.8ZM8 1.6v12.8',16)}</button>
+    <button class="iconbtn" id="railBtn" title="Collapse sidebar">${svgi('M2 3h12M2 8h12M2 13h12',16)}</button>
+  </div>
+</header>
+<div class="shell" id="shell"><nav class="rail" id="rail"></nav><main id="views" style="min-width:0;overflow:hidden"></main></div>
+<footer class="status">
+  <span id="stSolver">—</span><div class="sep"></div><span id="stUnits">Units: mm · kg · N · s · MPa</span>
+  <div class="sep"></div><span id="stSel">No selection</span>
+  <div class="r"><span id="stCount">—</span><span>Sample data · not for design release</span><span id="stGL">WebGL</span></div>
+</footer>`;
+
+const rail=U.q('#rail'), views=U.q('#views');
+ROUTES.forEach(r=>{
+  if(r.g){rail.appendChild(U.el('div','rail-group',r.g)); return;}
+  const b=U.el('button','navitem');
+  b.dataset.id=r.id;
+  b.innerHTML=svgi(r.i)+`<span>${r.n}</span>`;
+  b.onclick=()=>go(r.id);
+  rail.appendChild(b);
+  const v=U.el('div','view'); v.id='v-'+r.id; views.appendChild(v);
+});
+U.q('#railBtn').onclick=()=>U.q('#shell').classList.toggle('collapsed');
+U.q('#themeBtn').onclick=()=>{
+  const d=document.documentElement;
+  d.dataset.theme=d.dataset.theme==='dark'?'light':'dark';
+  U.toast('Theme: '+d.dataset.theme);
+};
+U.qa('.cmd').forEach(b=>b.onclick=()=>{
+  const a=b.dataset.act;
+  if(a==='import')U.toast('Import is disabled in the demo build — four sample projects are preloaded');
+  if(a==='open')go('projects'); if(a==='compare')go('comparison');
+  if(a==='validate'){go('validation'); U.toast('Validation checks re-evaluated against stored evidence');}
+  if(a==='report')go('reports');
+});
+
+function badge(st){return `<span class="pill ${st}">${STATUS_LABEL[st]}</span>`;}
+function go(id,opts){
+  ST.view=id;
+  U.qa('.navitem').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
+  U.qa('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+id));
+  const r=ROUTES.find(x=>x.id===id);
+  if(r&&r.proj){ST.proj=r.proj;}
+  RENDER[id]&&RENDER[id](opts||{});
+  const p=P(ST.proj);
+  U.q('#stSolver').textContent=p.solver;
+  U.q('#stCount').textContent=p.mesh.Nodes?`${p.mesh.Nodes} nodes`:`${p.mesh.Bodies} bodies`;
+  U.q('#ctx').innerHTML=`<span class="dot" style="background:var(--${p.status==='crit'?'crit':p.status==='warn'?'warn':'pass'})"></span>
+    <b>${p.name}</b><i>${p.id} · ${p.domain}</i>`;
+}
+function badgeCounts(){
+  let c=0,w=0; PROJECTS.forEach(p=>{c+=p.crit;w+=p.warn;});
+  const d=U.q('[data-id=diagnostics]'); if(d&&!d.querySelector('.tag'))
+    d.insertAdjacentHTML('beforeend',`<span class="tag ${c?'crit':''}">${c+w}</span>`);
+}
+
+/* ---------------- HOME ---------------- */
+const RENDER={};
+RENDER.home=()=>{
+  const v=U.q('#v-home');
+  const tot=PROJECTS.length, crit=PROJECTS.reduce((a,p)=>a+p.crit,0), warn=PROJECTS.reduce((a,p)=>a+p.warn,0);
+  v.innerHTML=`<div class="scroll">
+   <div class="vhead"><h1>Workspace</h1><p>Four sample projects are loaded. Every result value shown in this build is simulated sample data.</p></div>
+   <div class="sub">Last import 2026‑09‑18 14:02 · solver-independent result model v3</div>
+
+   <div class="grid g4" style="margin-bottom:16px">
+     ${[['Projects',tot,'2 domains active this week'],['Simulations','11','4 with results attached'],
+        ['Open findings',crit+warn,`${crit} critical · ${warn} warnings`],['Reports','3','1 draft awaiting sign-off']]
+       .map(s=>`<div class="slab stat"><span class="k">${s[0]}</span><span class="v">${s[1]}</span><span class="d">${s[2]}</span></div>`).join('')}
+   </div>
+
+   <div class="qa" style="margin-bottom:18px">
+     ${[['New project','Set up a result model and units','import'],['Import simulation','Read a solver result file','import'],
+        ['Open project','Jump into a workspace','projects'],['Compare results','Simulation A against B','comparison'],
+        ['Run analysis','Re-evaluate derived quantities','validation'],['Generate report','Assemble an engineering report','reports']]
+      .map(q=>`<button data-go="${q[2]}"><b>${q[0]}</b><i>${q[1]}</i></button>`).join('')}
+   </div>
+
+   <div class="grid g2">
+     <div class="slab">
+       <header>Recent projects<span class="r"><button class="btn sm" data-go="projects">All projects</button></span></header>
+       <table class="data"><thead><tr><th>Project</th><th>Domain</th><th>Solver run</th><th>Validation</th></tr></thead><tbody>
+       ${PROJECTS.map(p=>`<tr class="clickrow" data-proj="${p.id}"><td><b style="font-weight:500">${p.name}</b><br><span style="color:var(--ink-3);font-size:11px" class="num">${p.id} · ${p.file}</span></td>
+         <td>${p.domain}</td><td class="num" style="font-size:11.5px">${p.run}</td><td>${badge(p.status)}</td></tr>`).join('')}
+       </tbody></table>
+     </div>
+     <div class="slab">
+       <header>Warnings and critical findings<span class="r"><button class="btn sm" data-go="diagnostics">Diagnostics</button></span></header>
+       <table class="data"><thead><tr><th>Finding</th><th>Project</th><th>Severity</th></tr></thead><tbody>
+       ${PROJECTS.flatMap(p=>p.diag.filter(d=>d.sev!=='info').map(d=>`<tr class="clickrow" data-diag="${p.id}"><td>${d.t}</td><td class="num" style="font-size:11.5px">${p.id}</td>
+         <td><span class="pill ${d.sev}">${d.sev==='crit'?'Critical':'Warning'}</span></td></tr>`)).join('')}
+       </tbody></table>
+     </div>
+   </div>
+
+   <div class="grid g2" style="margin-top:14px">
+     <div class="slab">
+       <header>Analysis status</header>
+       <div class="body" style="display:grid;gap:10px">
+       ${PROJECTS.map(p=>{
+         const done=p.status==='pass'?100:p.status==='warn'?82:64;
+         return `<div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+           <span>${p.name}</span><span class="num" style="color:var(--ink-3)">${done}% reviewed</span></div>
+           <div class="bardiff"><div class="track"><i style="left:0;width:${done}%;background:var(--${p.status==='crit'?'crit':p.status==='warn'?'warn':'pass'})"></i></div></div></div>`;
+       }).join('')}
+       </div>
+     </div>
+     <div class="slab">
+       <header>Recent reports</header>
+       <table class="data"><thead><tr><th>Report</th><th>Built from</th><th>State</th></tr></thead><tbody>
+        <tr class="clickrow" data-go="reports"><td>Battery bracket — static strength</td><td class="num" style="font-size:11.5px">BRK-114</td><td><span class="pill pass">Issued</span></td></tr>
+        <tr class="clickrow" data-go="reports"><td>Aero body — drag assessment</td><td class="num" style="font-size:11.5px">AER-207</td><td><span class="pill warn">Draft</span></td></tr>
+        <tr class="clickrow" data-go="reports"><td>Cooling plate — thermal limits</td><td class="num" style="font-size:11.5px">THM-088</td><td><span class="pill idle">Not started</span></td></tr>
+       </tbody></table>
+     </div>
+   </div></div>`;
+  wire(v);
+};
+function wire(root){
+  U.qa('[data-go]',root).forEach(b=>b.onclick=()=>go(b.dataset.go));
+  U.qa('[data-proj]',root).forEach(b=>b.onclick=()=>openProject(b.dataset.proj));
+  U.qa('[data-diag]',root).forEach(b=>b.onclick=()=>{ST.proj=b.dataset.diag; go('diagnostics');});
+}
+function openProject(id){
+  ST.proj=id; const p=P(id);
+  const route={FEA:'fea',CFD:'cfd',Thermal:'thermal',MBD:'mbd'}[p.domain];
+  ST.tab=0; ST.varId=VARS[p.geom][0].id; go(route);
+}
+
+/* ---------------- PROJECTS / SIMULATIONS ---------------- */
+RENDER.projects=()=>{
+  const v=U.q('#v-projects');
+  v.innerHTML=`<div class="scroll">
+   <div class="vhead"><h1>Projects</h1><p>Each project holds geometry, mesh, materials, boundary conditions, load cases and result sets.</p></div>
+   <div class="sub">Sample data set · 4 projects · solver-independent result model</div>
+   <div class="grid g2">
+   ${PROJECTS.map(p=>`<div class="slab">
+     <header>${p.name}<span class="r">${badge(p.status)}</span></header>
+     <div class="body">
+       <div style="display:flex;gap:10px;font-size:11.5px;color:var(--ink-3);margin-bottom:10px" class="num">${p.id} · ${p.domain} · ${p.solver}</div>
+       <table class="data">${p.keyvals.map(k=>`<tr><td style="color:var(--ink-3)">${k[0]}</td><td class="n">${k[1]}</td></tr>`).join('')}</table>
+       <div style="display:flex;gap:7px;margin-top:11px">
+         <button class="btn primary sm" data-proj="${p.id}">Open workspace</button>
+         <button class="btn sm" data-vali="${p.id}">Validation</button>
+         <button class="btn sm" data-diag="${p.id}">Diagnostics</button>
+       </div>
+     </div></div>`).join('')}
+   </div></div>`;
+  wire(v); U.qa('[data-vali]',v).forEach(b=>b.onclick=()=>{ST.proj=b.dataset.vali;go('validation');});
+};
+RENDER.simulations=()=>{
+  const v=U.q('#v-simulations');
+  const rows=PROJECTS.flatMap(p=>p.cases.map((c,i)=>({p,c,i})));
+  v.innerHTML=`<div class="scroll">
+   <div class="vhead"><h1>Simulations</h1><p>All load cases and design iterations across the loaded projects.</p></div>
+   <div class="sub">Select a case to open it in its domain workspace.</div>
+   <div class="slab"><table class="data">
+    <thead><tr><th>Case</th><th>Project</th><th>Domain</th><th>Analysis type</th><th>Solver</th><th>Wall time</th><th>Result file</th><th>State</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr class="clickrow" data-proj="${r.p.id}">
+      <td><b style="font-weight:500">${r.c}</b></td><td class="num" style="font-size:11.5px">${r.p.id}</td><td>${r.p.domain}</td>
+      <td style="color:var(--ink-2)">${r.p.type}</td><td style="font-size:11.5px">${r.p.solver}</td>
+      <td class="n">${r.p.wall}</td><td class="num" style="font-size:11.5px;color:var(--ink-3)">${r.i===0?r.p.file:'— not imported —'}</td>
+      <td>${r.i===0?badge(r.p.status):'<span class="pill idle">Not validated</span>'}</td></tr>`).join('')}</tbody>
+   </table></div>
+   <p class="hint">Cases without a result file are defined in the project but have no data attached. Importing a result file maps solver output into the common result model.</p>
+   </div>`;
+  wire(v);
+};
+
+/* ---------------- WORKSPACE ---------------- */
+const TABS={
+ FEA:[{n:'Stress',v:['vonmises','s1']},{n:'Strain',v:['strain']},{n:'Displacement',v:['disp']},
+      {n:'Deformation',v:['disp'],deform:20},{n:'Reaction forces',v:['disp'],panel:'react'},
+      {n:'Contact',v:['contact'],panel:'contact'},{n:'Energy',v:['energy']},
+      {n:'Fatigue',v:['life'],panel:'fatigue'},{n:'Modal',v:['mode'],panel:'modal',anim:true},
+      {n:'Buckling',v:['mode'],panel:'buckling'}],
+ CFD:[{n:'Contours',v:['pressure','velocity','cp','temperature']},{n:'Vectors',v:['velocity'],overlay:'vectors'},
+      {n:'Streamlines',v:['velocity'],overlay:'streamlines'},{n:'Slices',v:['pressure'],clip:true},
+      {n:'Isosurfaces',v:['velocity'],panel:'iso'},{n:'Wall',v:['wallshear','yplus']},
+      {n:'Turbulence',v:['vorticity']},{n:'Convergence',v:['pressure'],panel:'conv'}],
+ Thermal:[{n:'Temperature',v:['temperature']},{n:'Heat flux',v:['heatflux']},{n:'Gradient',v:['gradient']},
+      {n:'Convection',v:['htc'],panel:'conv'},{n:'Sections',v:['temperature'],clip:true}],
+ MBD:[{n:'Kinematics',v:['disp','velocity','accel'],anim:true},{n:'Forces',v:['force'],panel:'joints'},
+      {n:'Bodies & joints',v:['disp'],panel:'topology'},{n:'Animation',v:['disp'],anim:true}]
+};
+function buildWorkspace(){
+  wsEl=U.el('div','ws');
+  wsEl.innerHTML=`
+  <section class="pane tree"><header>Project tree<span class="r"><button class="btn sm" id="treeCollapse">Collapse</button></span></header>
+    <div class="fill" id="treeBody"></div></section>
+  <div class="split v a" data-split="left"></div>
+  <section class="pane vp">
+    <div class="tabs" id="wsTabs"></div>
+    <div class="vpwrap" id="vpwrap">
+      <canvas id="gl"></canvas>
+      <div class="vptools" id="vptools"></div>
+      <div class="legend" id="legend"></div>
+      <div class="probe-tip" id="ptip"></div>
+      <div class="demo-flag">simulated sample data</div>
+      <div class="vpfoot">
+        <button class="btn sm" id="playBtn">Play</button>
+        <span id="tLabel">step 1 / 11</span>
+        <input type="range" id="tRange" min="0" max="10" value="0">
+        <span id="cursorVal">—</span>
+      </div>
+    </div>
+  </section>
+  <div class="split v b" data-split="right"></div>
+  <div class="split h" data-split="bottom"></div>
+  <section class="pane dock">
+    <div class="tabs" id="dockTabs">
+      ${['plots','statistics','calculations','diagnostics','log'].map(t=>`<button data-dock="${t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('')}
+    </div><div class="fill" id="dockBody"></div>
+  </section>
+  <section class="pane props">
+    <div class="tabs" id="propTabs">
+      ${[['props','Properties'],['vars','Results'],['filters','Filters'],['ctrl','Controls']].map(t=>`<button data-rt="${t[0]}">${t[1]}</button>`).join('')}
+    </div><div class="fill" id="propBody"></div>
+  </section>`;
+  return wsEl;
+}
+function mountWorkspace(host){
+  if(!wsEl)buildWorkspace();
+  if(wsEl.parentElement!==host){host.innerHTML=''; host.appendChild(wsEl);}
+  if(!VIEWER){
+    VIEWER=new Viewer(U.q('#gl'),{
+      onClick:(e,v)=>{
+        const h=v.pick(e); if(!h)return;
+        const val=v.valueAt(h.point), vr=v.vr;
+        const n=v.addProbe(h.point,val,vr.unit);
+        U.q('#stSel').textContent=`Probe P${n} · ${vr.label} = ${U.n(val,3)} ${vr.unit}`;
+        renderProps(); U.toast(`Probe P${n} placed`);
+      },
+      onHover:(e,v)=>{
+        const tip=U.q('#ptip'), h=v.vr?v.pick(e):null;
+        if(!h){tip.style.display='none'; return;}
+        const val=v.valueAt(h.point);
+        const r=v.c.getBoundingClientRect();
+        tip.style.display='block'; tip.style.left=(e.clientX-r.left+12)+'px'; tip.style.top=(e.clientY-r.top+12)+'px';
+        tip.innerHTML=`${U.n(val,3)} ${v.vr.unit}<br><span style="color:var(--ink-3)">${h.point.x.toFixed(1)}, ${h.point.y.toFixed(1)}, ${h.point.z.toFixed(1)}</span>`;
+        U.q('#cursorVal').textContent=U.n(val,3)+' '+v.vr.unit;
+      }
+    });
+    wireWorkspaceChrome();
+  }
+  setTimeout(()=>VIEWER.resize(),30);
+}
+function curVar(){const p=P(ST.proj); return VARS[p.geom].find(v=>v.id===ST.varId)||VARS[p.geom][0];}
+function loadWorkspace(){
+  const p=P(ST.proj);
+  VIEWER.load(p.geom,VARS[p.geom]);
+  VIEWER.fit(); VIEWER.view('iso');
+  applyTab(ST.tab,true);
+}
+function applyTab(i,force){
+  const p=P(ST.proj), tabs=TABS[p.domain]; ST.tab=Math.min(i,tabs.length-1);
+  const tb=tabs[ST.tab];
+  if(force||!tb.v.includes(ST.varId))ST.varId=tb.v[0];
+  VIEWER.state.deform=tb.deform||0;
+  VIEWER.state.clip=!!tb.clip; VIEWER.state.range=null; ST.mode=tb.overlay||null;
+  overlay(tb.overlay);
+  refreshAll();
+}
+function refreshAll(){
+  const p=P(ST.proj), v=curVar();
+  VIEWER.state.cmap=v.cm; VIEWER.paint(v);
+  renderTabs(); renderTree(); renderProps(); renderDock(); renderLegend();
+  U.q('#stUnits').textContent='Units: '+(p.domain==='CFD'?'m · kg · s · Pa':p.domain==='Thermal'?'mm · W · K':'mm · kg · N · s · MPa');
+}
+function renderTabs(){
+  const p=P(ST.proj), host=U.q('#wsTabs');
+  host.innerHTML=TABS[p.domain].map((t,i)=>`<button class="${i===ST.tab?'on':''}" data-tab="${i}">${t.n}</button>`).join('');
+  U.qa('[data-tab]',host).forEach(b=>b.onclick=()=>applyTab(+b.dataset.tab,true));
+  const dt=U.q('#dockTabs'); U.qa('button',dt).forEach(b=>b.classList.toggle('on',b.dataset.dock===ST.dock));
+  const pt=U.q('#propTabs'); U.qa('button',pt).forEach(b=>b.classList.toggle('on',b.dataset.rt===ST.rtab));
+}
+function renderLegend(){
+  const v=curVar(), l=U.q('#legend'), rng=VIEWER.state.range||[0,1];
+  const lo=v.min+(v.max-v.min)*rng[0], hi=v.min+(v.max-v.min)*rng[1];
+  const cv=document.createElement('canvas'); cv.width=16; cv.height=132;
+  const ctx=cv.getContext('2d');
+  for(let y=0;y<132;y++){const c=cmap(VIEWER.state.cmap,1-y/131);
+    ctx.fillStyle=`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; ctx.fillRect(0,y,16,1);}
+  const ticks=[0,1,2,3,4,5,6].map(i=>U.n(hi-(hi-lo)*i/6,Math.abs(hi)<10?3:1)).map(t=>`<span>${t}</span>`).join('');
+  l.innerHTML=`<div class="lt">${v.label}</div><div class="lu">[${v.unit}]</div>
+   <div class="bar">${cv.outerHTML}<div class="ticks">${ticks}</div></div>
+   <div class="ft">max ${U.n(v.max,3)}<br>min ${U.n(v.min,3)}<br>${VIEWER.state.cmap} · ${(rng[1]-rng[0]===1)?'full range':'filtered'}</div>`;
+  l.querySelector('canvas').getContext('2d').drawImage(cv,0,0);
+  const c2=l.querySelector('canvas').getContext('2d');
+  for(let y=0;y<132;y++){const c=cmap(VIEWER.state.cmap,1-y/131);
+    c2.fillStyle=`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; c2.fillRect(0,y,16,1);}
+}
+function overlay(kind){
+  if(VIEWER.ov){VIEWER.scene.remove(VIEWER.ov); VIEWER.ov=null;}
+  if(!kind||VIEWER.geomKey!=='carbody')return;
+  const g=new T.Group();
+  if(kind==='streamlines'){
+    for(let i=0;i<26;i++){
+      const y0=.25+ (i%13)*.085, z=(i<13?-1:1)*(.15+(i%13)*.06), pts=[];
+      for(let x=-3.4;x<3.6;x+=.12){
+        const near=Math.exp(-(x*x)/2.2);
+        pts.push(new T.Vector3(-x,y0+near*.42*(y0>.55?1:.25)+Math.sin(x*2+i)*.02*near,z*(1+near*.35)));
+      }
+      const geo=new T.BufferGeometry().setFromPoints(pts);
+      const col=cmap('jet',.3+.5*Math.exp(-((y0-.9)**2)/.2));
+      g.add(new T.Line(geo,new T.LineBasicMaterial({color:new T.Color(col[0]/255,col[1]/255,col[2]/255),transparent:true,opacity:.85})));
+    }
+  }
+  if(kind==='vectors'){
+    for(let x=-3;x<=3.2;x+=.42)for(let y=.25;y<=1.6;y+=.22){
+      const near=Math.exp(-((x)*(x))/2.2)*Math.exp(-((y-.7)**2)/.9);
+      const sp=.35+.65*(1-near);
+      const c=cmap('jet',sp);
+      const ar=new T.ArrowHelper(new T.Vector3(-1,near*.25,0).normalize(),new T.Vector3(x,y,0),
+        .16+sp*.16,new T.Color(c[0]/255,c[1]/255,c[2]/255),.06,.04);
+      g.add(ar);
+    }
+  }
+  VIEWER.ov=g; VIEWER.scene.add(g);
+}
+</script>
+<script>
+/* ---------------- tree ---------------- */
+function treeSec(label,icon,kids,open){
+  return `<div class="tsec"><div class="node tsecH" data-toggle="1"><span class="tw">${open?'▾':'▸'}</span>${svgi(icon,12)}<span>${label}</span><span class="meta">${kids.length}</span></div>
+   <div class="kids ${open?'open':''}">${kids.join('')}</div></div>`;
+}
+function renderTree(){
+  const p=P(ST.proj), host=U.q('#treeBody'), v=curVar();
+  const parts=VIEWER.parts.map((pt,i)=>`<div class="node" data-part="${i}" style="padding-left:26px">
+     <span class="tw">${pt.visible?'◉':'○'}</span><span>${pt.name}</span></div>`);
+  const mesh=Object.entries(p.mesh).map(([k,val])=>`<div class="node" style="padding-left:26px"><span class="tw"></span><span>${k}</span><span class="meta">${val}</span></div>`);
+  const mats=p.materials.map(m=>`<div class="node" data-mat="${m.n}" style="padding-left:26px"><span class="tw"></span><span>${m.n}</span></div>`);
+  const bcs=p.bcs.map(m=>`<div class="node" style="padding-left:26px"><span class="tw"></span><span>${m.n}</span><span class="meta">${m.p.length>22?m.p.slice(0,20)+'…':m.p}</span></div>`);
+  const lds=p.loads.map(m=>`<div class="node" style="padding-left:26px"><span class="tw"></span><span>${m.n}</span></div>`);
+  const cases=p.cases.map((c,i)=>`<div class="node ${i===0?'on':''}" style="padding-left:26px"><span class="tw">${i===0?'◉':'○'}</span><span>${c}</span>${i===0?'<span class="meta">loaded</span>':''}</div>`);
+  const groups={}; VARS[p.geom].forEach(vr=>{(groups[vr.tab]=groups[vr.tab]||[]).push(vr);});
+  const res=Object.entries(groups).map(([tab,vs])=>`<div class="node" style="padding-left:24px;color:var(--ink-3)"><span class="tw"></span><span>${tab}</span></div>`+
+    vs.map(vr=>`<div class="node ${vr.id===v.id?'on':''}" data-var="${vr.id}" style="padding-left:38px"><span class="tw"></span><span>${vr.label}</span><span class="meta">${vr.unit}</span></div>`).join('')).join('');
+  host.innerHTML=
+    treeSec('Geometry','multi',parts,true)+treeSec('Mesh','data',mesh,false)+treeSec('Materials','data',mats,false)+
+    treeSec('Boundary conditions','set',bcs,false)+treeSec('Loads','opt',lds,false)+
+    treeSec('Simulation cases','sim',cases,true)+treeSec('Results','fea',[res],true).replace('<span class="meta">1<','<span class="meta">'+VARS[p.geom].length+'<')+
+    treeSec('Reports','rep',[`<div class="node" data-go2="reports" style="padding-left:26px"><span class="tw"></span><span>Engineering report (draft)</span></div>`],false);
+  U.qa('.tsecH',host).forEach(h=>h.onclick=()=>{
+    const k=h.nextElementSibling; k.classList.toggle('open');
+    h.querySelector('.tw').textContent=k.classList.contains('open')?'▾':'▸';
+  });
+  U.qa('[data-var]',host).forEach(n=>n.onclick=()=>{ST.varId=n.dataset.var; VIEWER.state.range=null; refreshAll();});
+  U.qa('[data-part]',host).forEach(n=>n.onclick=()=>{
+    const pt=VIEWER.parts[+n.dataset.part]; pt.visible=!pt.visible; VIEWER.applyStyle(); renderTree();
+  });
+  U.qa('[data-go2]',host).forEach(n=>n.onclick=()=>go(n.dataset.go2));
+  U.q('#treeCollapse').onclick=()=>U.qa('.kids',host).forEach(k=>{k.classList.remove('open'); k.previousElementSibling.querySelector('.tw').textContent='▸';});
+}
+
+/* ---------------- right panel ---------------- */
+function row(k,v){return `<div class="prow"><span class="k">${k}</span><span class="v">${v}</span></div>`;}
+function renderProps(){
+  const p=P(ST.proj), v=curVar(), host=U.q('#propBody');
+  if(ST.rtab==='props'){
+    host.innerHTML=
+      `<div class="psec">project</div>`+row('Name',p.name)+row('ID',p.id)+row('Domain',p.domain)+row('Analysis',p.type.split('·')[0])+
+      `<div class="psec">solver</div>`+row('Solver',p.solver)+row('Result file',p.file)+row('Size',p.size)+row('Run',p.run)+row('Wall time',p.wall)+
+      `<div class="psec">active result</div>`+row('Variable',v.label)+row('Unit',v.unit)+row('Maximum',U.n(v.max,3))+row('Minimum',U.n(v.min,3))+
+      (v.node?row('Max at node',v.node):'')+`<div class="prow"><span class="k">Location of max</span></div><div class="prow"><span class="v" style="text-align:left;font-size:11px;color:var(--ink-2)">${v.loc}</span></div>`+
+      `<div class="psec">probes</div>`+
+      (VIEWER.probes.length?VIEWER.probes.map((pr,i)=>row('P'+(i+1)+' ('+pr.pt.x.toFixed(1)+', '+pr.pt.y.toFixed(1)+', '+pr.pt.z.toFixed(1)+')',U.n(pr.val,3)+' '+pr.unit)).join('')
+        :`<div class="prow"><span class="k">Click the model to place a probe</span></div>`)+
+      `<div class="psec">material</div>`+p.materials.map(m=>`<div class="prow"><span class="k" style="flex:none;width:100%"><b style="color:var(--ink);font-weight:500">${m.n}</b><br><span style="font-size:11px">${m.p}</span></span></div>`).join('');
+  }
+  if(ST.rtab==='vars'){
+    const groups={}; VARS[p.geom].forEach(vr=>{(groups[vr.tab]=groups[vr.tab]||[]).push(vr);});
+    host.innerHTML=Object.entries(groups).map(([tab,vs])=>`<div class="psec">${tab.toLowerCase()}</div><div class="varlist">`+
+      vs.map(vr=>`<button class="${vr.id===v.id?'on':''}" data-v="${vr.id}">${vr.label}<span class="u">${vr.unit}</span></button>`).join('')+'</div>').join('');
+    U.qa('[data-v]',host).forEach(b=>b.onclick=()=>{ST.varId=b.dataset.v; VIEWER.state.range=null; refreshAll();});
+  }
+  if(ST.rtab==='filters'){
+    const r=VIEWER.state.range||[0,1];
+    host.innerHTML=`
+    <div class="psec">value range</div>
+    <div class="ctl"><label>Lower bound<b id="loV">${U.n(v.min+(v.max-v.min)*r[0],3)} ${v.unit}</b></label>
+      <input type="range" id="loR" min="0" max="100" value="${r[0]*100}"></div>
+    <div class="ctl"><label>Upper bound<b id="hiV">${U.n(v.min+(v.max-v.min)*r[1],3)} ${v.unit}</b></label>
+      <input type="range" id="hiR" min="0" max="100" value="${r[1]*100}"></div>
+    <label class="chk"><input type="checkbox" id="clipBelow"> Grey out values outside range</label>
+    <div class="ctl"><label>Colour map</label>
+      <select id="cmapSel">${Object.keys(CMAPS).map(c=>`<option ${c===VIEWER.state.cmap?'selected':''}>${c}</option>`).join('')}</select></div>
+    <div class="psec">quick thresholds</div>
+    <div class="ctl" style="gap:6px">
+      <button class="btn sm" data-th="0.8">Above 80 % of maximum</button>
+      <button class="btn sm" data-th="0.9">Above 90 % of maximum</button>
+      <button class="btn sm" data-th="reset">Reset to full range</button>
+    </div>
+    <div class="psec">section &amp; clipping</div>
+    <label class="chk"><input type="checkbox" id="clipOn" ${VIEWER.state.clip?'checked':''}> Section plane active</label>
+    <div class="ctl"><label>Axis</label><select id="clipAxis">${['x','y','z'].map(a=>`<option ${a===VIEWER.state.axis?'selected':''}>${a}</option>`).join('')}</select></div>
+    <div class="ctl"><label>Position<b id="clipV">${(VIEWER.state.clipPos*100).toFixed(0)} %</b></label>
+      <input type="range" id="clipR" min="0" max="100" value="${VIEWER.state.clipPos*100}"></div>
+    <div class="psec">visibility</div>
+    ${VIEWER.parts.map((pt,i)=>`<label class="chk"><input type="checkbox" data-pv="${i}" ${pt.visible?'checked':''}> ${pt.name}</label>`).join('')}`;
+    const setR=()=>{
+      const lo=+U.q('#loR').value/100, hi=+U.q('#hiR').value/100;
+      VIEWER.state.range=[Math.min(lo,hi),Math.max(lo,hi)];
+      VIEWER.paint(v); renderLegend();
+      U.q('#loV').textContent=U.n(v.min+(v.max-v.min)*Math.min(lo,hi),3)+' '+v.unit;
+      U.q('#hiV').textContent=U.n(v.min+(v.max-v.min)*Math.max(lo,hi),3)+' '+v.unit;
+    };
+    U.q('#loR').oninput=setR; U.q('#hiR').oninput=setR;
+    U.q('#cmapSel').onchange=e=>{VIEWER.state.cmap=e.target.value; VIEWER.paint(v); renderLegend();};
+    U.qa('[data-th]',host).forEach(b=>b.onclick=()=>{
+      if(b.dataset.th==='reset')VIEWER.state.range=null; else VIEWER.state.range=[+b.dataset.th,1];
+      refreshAll(); U.toast(b.dataset.th==='reset'?'Range reset':'Range limited to the top '+(100-b.dataset.th*100)+' %');
+    });
+    U.q('#clipOn').onchange=e=>{VIEWER.state.clip=e.target.checked; VIEWER.applyStyle();};
+    U.q('#clipAxis').onchange=e=>{VIEWER.state.axis=e.target.value; VIEWER.applyStyle();};
+    U.q('#clipR').oninput=e=>{VIEWER.state.clipPos=+e.target.value/100; U.q('#clipV').textContent=e.target.value+' %'; VIEWER.applyStyle();};
+    U.qa('[data-pv]',host).forEach(c=>c.onchange=()=>{VIEWER.parts[+c.dataset.pv].visible=c.checked; VIEWER.applyStyle(); renderTree();});
+  }
+  if(ST.rtab==='ctrl'){
+    host.innerHTML=`
+    <div class="psec">display</div>
+    <div class="ctl"><label>Deformation scale<b id="dsV">${VIEWER.state.deform}×</b></label>
+      <input type="range" id="dsR" min="0" max="60" value="${VIEWER.state.deform}"></div>
+    <label class="chk"><input type="checkbox" id="wireC" ${VIEWER.state.wire?'checked':''}> Wireframe</label>
+    <label class="chk"><input type="checkbox" id="transC" ${VIEWER.state.transp?'checked':''}> Transparency</label>
+    <label class="chk"><input type="checkbox" id="edgeC" ${VIEWER.state.edges?'checked':''}> Element edges</label>
+    <div class="psec">view</div>
+    <div class="ctl" style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px">
+      ${['iso','front','top','right','left'].map(x=>`<button class="btn sm" data-view="${x}">${x}</button>`).join('')}
+      <button class="btn sm" data-view="fit">fit</button></div>
+    <div class="psec">time / step</div>
+    ${row('Steps available','11')}${row('Current step',(+U.q('#tRange').value+1)+' / 11')}
+    <div class="ctl"><label>Animation speed</label><select id="spd"><option>0.5×</option><option selected>1×</option><option>2×</option></select></div>
+    <div class="psec">derived quantities</div>
+    ${p.calcs.map(c=>`<div class="prow"><span class="k">${c.n}</span><span class="v">${c.r} ${c.u}</span></div>`).join('')}
+    <div class="ctl"><button class="btn sm" data-go3="calcs">Open calculation sheet</button>
+    <button class="btn sm" id="clrProbe">Clear probes</button></div>`;
+    U.q('#dsR').oninput=e=>{VIEWER.state.deform=+e.target.value; U.q('#dsV').textContent=e.target.value+'×'; VIEWER.paint(curVar());};
+    U.q('#wireC').onchange=e=>{VIEWER.state.wire=e.target.checked; VIEWER.applyStyle();};
+    U.q('#transC').onchange=e=>{VIEWER.state.transp=e.target.checked; VIEWER.applyStyle();};
+    U.q('#edgeC').onchange=e=>{VIEWER.edgesOn(e.target.checked); VIEWER.applyStyle();};
+    U.qa('[data-view]',host).forEach(b=>b.onclick=()=>{b.dataset.view==='fit'?VIEWER.fit():VIEWER.view(b.dataset.view);});
+    U.q('#clrProbe').onclick=()=>{VIEWER.clearProbes(); renderProps(); U.toast('Probes cleared');};
+    U.qa('[data-go3]',host).forEach(b=>b.onclick=()=>go('optimization'));
+  }
+}
+
+/* ---------------- dock ---------------- */
+function stats(){
+  const v=curVar(); let vals=[];
+  VIEWER.parts.filter(p=>!p.fixed&&p.visible).forEach(p=>{
+    const b=p.geo.userData.base, o=p.pivot||p.pos;
+    for(let i=0;i<b.length;i+=3){
+      const f=Math.max(0,Math.min(1,v.f(b[i]+o[0],b[i+1]+o[1],b[i+2]+o[2],VIEWER.state.t)));
+      vals.push(v.min+(v.max-v.min)*f);
+    }
+  });
+  vals.sort((a,b)=>a-b);
+  const n=vals.length, mean=vals.reduce((a,b)=>a+b,0)/n;
+  const sd=Math.sqrt(vals.reduce((a,b)=>a+(b-mean)**2,0)/n);
+  const q=f=>vals[Math.min(n-1,Math.floor(f*n))];
+  const bins=new Array(24).fill(0);
+  vals.forEach(x=>{const i=Math.min(23,Math.floor((x-vals[0])/((vals[n-1]-vals[0])||1)*24)); bins[i]++;});
+  return {n,min:vals[0],max:vals[n-1],mean,sd,p50:q(.5),p95:q(.95),p99:q(.99),bins};
+}
+function renderDock(){
+  const p=P(ST.proj), host=U.q('#dockBody'), v=curVar();
+  if(ST.dock==='plots'){
+    const extra=p.plots.map(pl=>plot(pl,160)).join('');
+    host.innerHTML=`<div class="plotwrap" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">${extra}</div>`;
+  }
+  if(ST.dock==='statistics'){
+    const s=stats();
+    const mx=Math.max(...s.bins);
+    const bars=s.bins.map((b,i)=>`<rect x="${20+i*22}" y="${110-(b/mx)*86}" width="18" height="${(b/mx)*86}" fill="rgb(${cmap(VIEWER.state.cmap,i/23).map(c=>c|0).join(',')})"/>`).join('');
+    host.innerHTML=`<div style="display:grid;grid-template-columns:260px 1fr;gap:14px;padding:10px">
+      <div class="slab"><header>${v.label} · sampled statistics</header>
+      <table class="data">
+        ${[['Sample points',s.n.toLocaleString()],['Minimum',U.n(s.min,3)+' '+v.unit],['Maximum',U.n(s.max,3)+' '+v.unit],
+          ['Mean',U.n(s.mean,3)+' '+v.unit],['Standard deviation',U.n(s.sd,3)+' '+v.unit],['Median (P50)',U.n(s.p50,3)+' '+v.unit],
+          ['P95',U.n(s.p95,3)+' '+v.unit],['P99',U.n(s.p99,3)+' '+v.unit]]
+          .map(r=>`<tr><td style="color:var(--ink-3)">${r[0]}</td><td class="n">${r[1]}</td></tr>`).join('')}
+      </table></div>
+      <div class="slab"><header>Distribution over visible bodies · step ${(+U.q('#tRange').value+1)}</header>
+        <svg class="plot" viewBox="0 0 560 130"><text class="ttl" x="6" y="12">count per bin (24 bins)</text>${bars}
+        <line class="ax" x1="18" y1="110" x2="548" y2="110"/>
+        <text x="20" y="124">${U.n(s.min,2)}</text><text x="540" y="124" text-anchor="end">${U.n(s.max,2)} ${v.unit}</text></svg>
+        <p class="hint" style="padding:0 12px 10px">Statistics are computed over the visible bodies at the current step. Hidden bodies and clipped regions are excluded.</p>
+      </div></div>`;
+  }
+  if(ST.dock==='diagnostics'){
+    host.innerHTML=`<div style="padding:10px;display:grid;gap:8px">${p.diag.map(findingHTML).join('')}</div>`;
+    wireFindings(host);
+  }
+  if(ST.dock==='log'){
+    host.innerHTML=p.logs.map(l=>`<div class="logline"><span class="t">${l[0]}</span><span class="lv ${l[1]}">${l[1]}</span><span>${l[2]}</span></div>`).join('');
+  }
+}
+function findingHTML(d){
+  return `<div class="finding"><div class="fh"><span class="pill ${d.sev}">${d.sev==='crit'?'Critical':d.sev==='warn'?'Warning':'Information'}</span>
+    <span class="ttl">${d.t}</span><span class="loc">${d.loc.split('·')[0]}</span></div>
+    <div class="fb"><div class="evidence"><div class="eh">evidence</div>
+      <table class="data">${d.ev.map(e=>`<tr><td style="color:var(--ink-3)">${e[0]}</td><td class="n">${e[1]}</td></tr>`).join('')}</table></div>
+      <dl class="kv"><dt>Location</dt><dd>${d.loc}</dd><dt>Possible cause</dt><dd>${d.cause}</dd>
+      <dt>Recommended investigation</dt><dd>${d.action}</dd></dl></div></div>`;
+}
+function wireFindings(root){
+  U.qa('.finding .fh',root).forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('open'));
+}
+
+/* ---------------- workspace chrome ---------------- */
+function wireWorkspaceChrome(){
+  U.qa('#dockTabs button').forEach(b=>b.onclick=()=>{ST.dock=b.dataset.dock; renderTabs(); renderDock();});
+  U.qa('#propTabs button').forEach(b=>b.onclick=()=>{ST.rtab=b.dataset.rt; renderTabs(); renderProps();});
+  const tools=[['fit','Fit view','M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4'],['iso','Isometric','M8 2 14 5.5v7L8 16 2 12.5v-7Z'],
+    ['front','Front','M3 3h10v10H3Z'],['top','Top','M3 5.5 8 3l5 2.5L8 8Z'],['right','Right','M5 3h6v10H5Z'],
+    ['wire','Wireframe','M2 4h12v8H2ZM2 8h12M8 4v8'],['transp','Transparency','M2 2h6v6H2ZM8 8h6v6H8Z'],
+    ['section','Section plane','M2 12 14 4M5 14h9V5'],['clear','Clear probes','M3 3l10 10M13 3 3 13']];
+  U.q('#vptools').innerHTML=tools.map(t=>`<button class="vptool" data-tool="${t[0]}" title="${t[1]}">${svgi(t[2],14)}</button>`).join('');
+  U.qa('#vptools .vptool').forEach(b=>b.onclick=()=>{
+    const t=b.dataset.tool, s=VIEWER.state;
+    if(t==='fit')VIEWER.fit();
+    else if(['iso','front','top','right'].includes(t))VIEWER.view(t);
+    else if(t==='wire'){s.wire=!s.wire; VIEWER.applyStyle();}
+    else if(t==='transp'){s.transp=!s.transp; VIEWER.applyStyle();}
+    else if(t==='section'){s.clip=!s.clip; VIEWER.applyStyle();}
+    else if(t==='clear'){VIEWER.clearProbes(); renderProps();}
+    U.qa('#vptools .vptool').forEach(x=>{
+      const k=x.dataset.tool;
+      x.classList.toggle('on',(k==='wire'&&s.wire)||(k==='transp'&&s.transp)||(k==='section'&&s.clip));
+    });
+  });
+  const tr=U.q('#tRange');
+  tr.oninput=()=>{
+    VIEWER.state.t=+tr.value/10; U.q('#tLabel').textContent=`step ${+tr.value+1} / 11`;
+    VIEWER.paint(curVar()); if(ST.dock==='statistics')renderDock();
+  };
+  let timer=null;
+  U.q('#playBtn').onclick=e=>{
+    if(timer){clearInterval(timer); timer=null; e.target.textContent='Play'; return;}
+    e.target.textContent='Pause';
+    timer=setInterval(()=>{tr.value=(+tr.value+1)%11; tr.oninput();},140);
+  };
+  // splitters
+  U.qa('.split').forEach(s=>{
+    s.addEventListener('pointerdown',e=>{
+      s.setPointerCapture(e.pointerId); s.classList.add('drag');
+      const kind=s.dataset.split, rect=wsEl.getBoundingClientRect();
+      const move=ev=>{
+        if(kind==='left')wsEl.style.setProperty('--lw',Math.max(170,Math.min(460,ev.clientX-rect.left))+'px');
+        if(kind==='right')wsEl.style.setProperty('--rw',Math.max(200,Math.min(520,rect.right-ev.clientX))+'px');
+        if(kind==='bottom')wsEl.style.setProperty('--bh',Math.max(90,Math.min(rect.height-180,rect.bottom-ev.clientY))+'px');
+        VIEWER.resize();
+      };
+      const up=()=>{s.classList.remove('drag'); window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);};
+      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+    });
+  });
+}
+['fea','cfd','thermal','mbd'].forEach(r=>{
+  RENDER[r]=()=>{ mountWorkspace(U.q('#v-'+r)); loadWorkspace(); };
+});
+</script>
+<script>
+/* ---------------- MULTIPHYSICS / MODULE REGISTRY ---------------- */
+RENDER.multiphysics=()=>{
+  const v=U.q('#v-multiphysics');
+  const pipe=['Solver','Result files','Import / parser','CAE data model','Validation','Post-processing','Engineering analysis','Visualization','Diagnostics','AI interpretation','Comparison','Report'];
+  const mods=[
+   ['FEA / Structural','Active','Linear static, nonlinear, contact, transient, modal, harmonic, random vibration, buckling, fatigue, fracture, crash, explicit'],
+   ['CFD','Active','Internal and external flow, laminar and turbulent, compressible, heat transfer, CHT, multiphase, combustion, rotating machinery, aeroacoustics'],
+   ['Thermal','Active','Steady and transient conduction, convection, radiation, thermo-mechanical coupling'],
+   ['MBD','Active','Kinematics, dynamics, joints and constraints, vehicle dynamics'],
+   ['Multiphysics / FSI','Planned','One-way and two-way coupling, mapped load transfer between structural and fluid models'],
+   ['Electromagnetic','Planned','Low and high frequency fields, losses, force density mapping'],
+   ['Battery / electro-thermal','Planned','Cell heat generation, pack thermal response, ageing indicators'],
+   ['Acoustics / NVH','Planned','Radiated noise, modal contribution, frequency response'],
+   ['Manufacturing simulation','Planned','Forming, casting, additive residual stress'],
+   ['Optimization / DOE','Preview','Design of experiments, sensitivity, response surfaces'],
+   ['ML surrogate models','Preview','Trained response surfaces for rapid what-if evaluation']
+  ];
+  const fmt=[['ANSYS Mechanical','.rst / .rth','Native reader','Nodal and elemental results, load steps, contact status'],
+   ['ANSYS Fluent','.cas / .dat','Native reader','Cell and face data, residuals, surface and volume reports'],
+   ['Abaqus','.odb','Reader (planned)','Field and history output'],
+   ['OpenFOAM','time directories','Reader (planned)','Volume and boundary fields'],
+   ['MSC Adams','.res / .req','Native reader','Body, joint and force channels'],
+   ['Nastran','.op2','Reader (planned)','Displacement, stress, modal data'],
+   ['Neutral exchange','CGNS / EnSight / VTK','Native reader','Generic mesh and field exchange']];
+  v.innerHTML=`<div class="scroll">
+   <div class="vhead"><h1>Modules and result model</h1><p>The post-processing layer is solver-independent: each reader maps solver output into one common result model.</p></div>
+   <div class="sub">Adding a domain means adding a reader, a variable catalogue and a diagnostic rule set — the core application is unchanged.</div>
+   <div class="slab" style="margin-bottom:14px"><header>Processing pipeline</header>
+    <div class="body" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+     ${pipe.map((s,i)=>`<span style="padding:5px 9px;border:1px solid var(--line);border-radius:3px;background:var(--raise);font-size:11.5px">${s}</span>${i<pipe.length-1?'<span style="color:var(--ink-3)">→</span>':''}`).join('')}
+    </div></div>
+   <div class="grid g2">
+     <div class="slab"><header>Domain modules</header>
+       <table class="data"><thead><tr><th>Module</th><th>State</th><th>Coverage</th></tr></thead><tbody>
+       ${mods.map(m=>`<tr><td><b style="font-weight:500">${m[0]}</b></td>
+         <td><span class="pill ${m[1]==='Active'?'pass':m[1]==='Preview'?'info':'idle'}">${m[1]}</span></td>
+         <td style="color:var(--ink-2);font-size:11.8px">${m[2]}</td></tr>`).join('')}</tbody></table></div>
+     <div class="slab"><header>Result file readers</header>
+       <table class="data"><thead><tr><th>Solver</th><th>Format</th><th>Reader</th><th>Mapped into the model</th></tr></thead><tbody>
+       ${fmt.map(f=>`<tr><td>${f[0]}</td><td class="num" style="font-size:11.5px">${f[1]}</td>
+         <td><span class="pill ${f[2].includes('planned')?'idle':'pass'}">${f[2]}</span></td>
+         <td style="color:var(--ink-2);font-size:11.8px">${f[3]}</td></tr>`).join('')}</tbody></table>
+       <p class="hint" style="padding:0 12px 12px">The common model stores mesh topology, node and element sets, a unit system, time or frequency steps, and named result fields with their provenance.</p>
+     </div>
+   </div></div>`;
+};
+
+/* ---------------- COMPARISON ---------------- */
+const COMPARE={
+ 'BRK-114':{a:'Baseline bracket — LC3',b:'Rib thickness 5 → 7 mm — LC3',k:.86,varId:'vonmises',
+  rows:[['Peak von Mises','MPa',214.6,184.5,true],['Minimum safety factor','—',1.29,1.50,false],
+        ['Max total deformation','mm',0.412,0.338,true],['Mass','kg',1.842,1.986,true],
+        ['First natural frequency','Hz',412.6,446.9,false],['Peak contact pressure','MPa',96.4,88.1,true]],
+  plot:{t:'Stress at node 48213 through LC2',x:'Time (ms)',y:'MPa',
+    s:[{n:'A baseline',d:[[0,4],[6,138],[12,214.6],[18,88],[24,7]]},{n:'B thicker rib',d:[[0,3],[6,119],[12,184.5],[18,76],[24,6]]}]}},
+ 'AER-207':{a:'Baseline body',b:'Rear spoiler +15 mm',k:1.06,varId:'pressure',
+  rows:[['Drag coefficient','—',0.284,0.291,true],['Lift coefficient','—',-0.061,-0.118,false],
+        ['Drag force at 100 km/h','N',292.7,299.9,true],['Rear axle lift','N',48.2,12.4,true],
+        ['Max wall y+','—',118,121,true],['Aerodynamic power','kW',8.13,8.33,true]],
+  plot:{t:'Monitored drag coefficient',x:'Iteration',y:'Cd',
+    s:[{n:'A baseline',d:[[0,.62],[200,.336],[600,.291],[1240,.284]]},{n:'B spoiler',d:[[0,.64],[200,.352],[600,.299],[1240,.291]]}]}},
+ 'THM-088':{a:'6 L/min baseline',b:'9 L/min',k:.9,varId:'temperature',
+  rows:[['Max cell temperature','°C',58.3,53.1,true],['Cell-to-cell spread','K',11.4,8.2,true],
+        ['Coolant Δt','K',5.3,3.6,true],['Pressure drop','kPa',18.6,36.4,true],['Pump power','W',1.86,5.46,true]],
+  plot:{t:'Plate surface temperature along flow path',x:'Path length (mm)',y:'°C',
+    s:[{n:'A 6 L/min',d:[[0,38.2],[240,47.9],[480,56.1],[600,58.3]]},{n:'B 9 L/min',d:[[0,36.1],[240,44.2],[480,50.8],[600,53.1]]}]}},
+ 'MBD-052':{a:'Swept sine ride',b:'Single 60 mm bump',k:.78,varId:'force',
+  rows:[['Max joint force at J3','N',6842,5310,true],['Peak wheel travel','mm',78.2,61.4,true],
+        ['Peak vertical acceleration','m/s²',12.4,18.6,true],['Ball joint utilisation','%',92.5,71.8,true]],
+  plot:{t:'Lower ball joint reaction force',x:'Time (s)',y:'N',
+    s:[{n:'A swept sine',d:[[0,2210],[.6,4610],[1.0,5840],[1.4,6842],[2,3010]]},{n:'B single bump',d:[[0,2180],[.6,5310],[1.0,3420],[1.4,2890],[2,2310]]}]}}
+};
+let CMPV=[null,null];
+RENDER.comparison=()=>{
+  const v=U.q('#v-comparison'), pid=ST.proj, c=COMPARE[pid], p=P(pid);
+  v.innerHTML=`<div class="scroll">
+   <div class="vhead"><h1>Comparison</h1><p>Two result sets from the same project, evaluated against the same variables and the same colour range.</p></div>
+   <div class="sub">Project: select a study to compare its design iterations or operating points.</div>
+   <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+     ${PROJECTS.map(x=>`<button class="btn sm ${x.id===pid?'primary':''}" data-cp="${x.id}">${x.name}</button>`).join('')}
+   </div>
+   <div class="cmp-heads" style="margin-bottom:10px">
+     <div class="slab"><header>Simulation A<span class="r"><span class="pill info">reference</span></span></header>
+       <div class="body" style="font-size:12.3px">${c.a}<div class="num" style="color:var(--ink-3);font-size:11px;margin-top:3px">${p.solver}</div></div></div>
+     <div class="slab"><header>Simulation B<span class="r"><span class="pill idle">variant</span></span></header>
+       <div class="body" style="font-size:12.3px">${c.b}<div class="num" style="color:var(--ink-3);font-size:11px;margin-top:3px">${p.solver}</div></div></div>
+   </div>
+   <div class="dualvp" id="dual">
+     <div><canvas id="glA"></canvas><span class="tagv">A · ${c.a}</span></div>
+     <div><canvas id="glB"></canvas><span class="tagv" id="tagB">B · ${c.b}</span></div>
+   </div>
+   <div style="display:flex;gap:8px;align-items:center;margin:10px 0 16px;flex-wrap:wrap">
+     <label class="chk"><input type="checkbox" id="syncV" checked> Synchronise views</label>
+     <label class="chk"><input type="checkbox" id="diffV"> Show B as difference field (B − A)</label>
+     <span class="hint" style="margin:0">Both views share one colour range so contours are directly comparable.</span>
+   </div>
+   <div class="grid g2">
+     <div class="slab"><header>Scalar comparison</header>
+       <table class="data"><thead><tr><th>Quantity</th><th style="text-align:right">A</th><th style="text-align:right">B</th><th style="text-align:right">Δ</th><th>Change</th></tr></thead><tbody>
+       ${c.rows.map(r=>{
+         const d=r[3]-r[2], pc=(d/Math.abs(r[2]))*100, good=(d<0)===!!r[4];
+         const w=Math.min(100,Math.abs(pc)*1.6);
+         return `<tr><td>${r[0]}<span class="num" style="color:var(--ink-3);font-size:10.5px"> [${r[1]}]</span></td>
+          <td class="n">${U.n(r[2],3)}</td><td class="n">${U.n(r[3],3)}</td>
+          <td class="n" style="color:var(--${good?'pass':'crit'})">${d>0?'+':''}${U.n(pc,1)} %</td>
+          <td><div class="bardiff"><div class="track"><i class="${d>0?'up':'down'}" style="left:${d>0?50:50-w/2}%;width:${w/2}%"></i></div></div></td></tr>`;
+       }).join('')}</tbody></table>
+       <p class="hint" style="padding:0 12px 12px">Green marks a change in the desirable direction for that quantity; the direction is defined per quantity, not by sign alone.</p></div>
+     <div class="slab"><header>Overlaid history</header><div class="plotwrap">${plot(c.plot,190)}</div></div>
+   </div>
+   <div class="slab" style="margin-top:14px"><header>What the comparison supports</header>
+     <div class="body" style="font-size:12.4px;color:var(--ink-2);max-width:78ch">
+       Both result sets use the same mesh family, the same solver version and the same load definition, so the differences above are attributable to the design change.
+       Quantities that depend on mesh resolution — peak stress and maximum y+ in particular — carry the convergence uncertainty recorded in the Validation centre and should be read with that band in mind.
+     </div></div>
+  </div>`;
+  U.qa('[data-cp]',v).forEach(b=>b.onclick=()=>{ST.proj=b.dataset.cp; RENDER.comparison();});
+  CMPV.forEach(x=>{if(x){x.ro&&x.ro.disconnect(); x.renderer.dispose(); x.renderer.forceContextLoss&&x.renderer.forceContextLoss(); x.dead=true;}});
+  CMPV=[null,null];
+  setTimeout(()=>{
+    const vr=VARS[p.geom].find(x=>x.id===c.varId);
+    const A=new Viewer(U.q('#glA')), B=new Viewer(U.q('#glB'));
+    A.load(p.geom); B.load(p.geom); A.fit(); B.fit(); A.view('iso'); B.view('iso');
+    const vb=Object.assign({},vr,{f:(x,y,z,t)=>Math.max(0,Math.min(1,vr.f(x,y,z,t)*c.k))});
+    const vd=Object.assign({},vr,{f:(x,y,z,t)=>Math.max(0,Math.min(1,.5+(vr.f(x,y,z,t)*c.k-vr.f(x,y,z,t))*2.2))});
+    A.state.t=.9; B.state.t=.9; A.paint(vr); B.paint(vb);
+    A.resize(); B.resize(); CMPV=[A,B];
+    const sync=U.q('#syncV'), diff=U.q('#diffV');
+    (function tick(){if(A.dead||B.dead)return; requestAnimationFrame(tick); if(sync.checked){B.sph.r=A.sph.r;B.sph.th=A.sph.th;B.sph.ph=A.sph.ph;B.target.copy(A.target);}})();
+    diff.onchange=()=>{
+      if(diff.checked){B.state.cmap='coolwarm'; B.paint(vd); U.q('#tagB').textContent='B − A · difference field';}
+      else{B.state.cmap=vr.cm; B.paint(vb); U.q('#tagB').textContent='B · '+c.b;}
+    };
+  },40);
+};
+
+/* ---------------- VALIDATION ---------------- */
+RENDER.validation=()=>{
+  const v=U.q('#v-validation');
+  v.innerHTML=`<div class="scroll">
+   <div class="vhead"><h1>Validation centre</h1><p>Every status below is backed by the evidence that produced it.</p></div>
+   <div class="sub">Statuses: Verified · Passed with warnings · Requires investigation · Not validated</div>
+   ${PROJECTS.map(p=>`
+   <div class="slab" style="margin-bottom:14px">
+     <header>${p.name}<span class="num" style="color:var(--ink-3);font-size:11px">${p.id}</span><span class="r">${badge(p.status)}</span></header>
+     <table class="data"><thead><tr><th style="width:210px">Check</th><th style="width:170px">Status</th><th>Finding</th><th style="width:90px"></th></tr></thead><tbody>
+     ${p.valid.map((c,i)=>`<tr><td><b style="font-weight:500">${c.n}</b></td><td>${badge(c.s)}</td>
+       <td style="color:var(--ink-2)">${c.m}</td><td><button class="btn sm" data-ev="${p.id}|${i}">Evidence</button></td></tr>
+       <tr id="ev-${p.id}-${i}" style="display:none"><td colspan="4" style="background:var(--surface);padding:0">
+         <div style="padding:10px 12px"><div class="evidence"><div class="eh">evidence used for this status</div>
+         <table class="data">${c.ev.map(e=>`<tr><td style="color:var(--ink-3)">${e[0]}</td><td class="n">${e[1]}</td></tr>`).join('')}</table></div></div></td></tr>`).join('')}
+     </tbody></table>
+   </div>`).join('')}
+   <p class="hint">A status is never reported without the underlying numbers. Where no data exists — for example a missing experimental correlation — the check stays "Not validated" rather than being assumed to pass.</p>
+   </div>`;
+  U.qa('[data-ev]',v).forEach(b=>b.onclick=()=>{
+    const [pid,i]=b.dataset.ev.split('|'), r=U.q('#ev-'+pid+'-'+i);
+    const open=r.style.display!=='none'; r.style.display=open?'none':'table-row'; b.textContent=open?'Evidence':'Hide';
+  });
+};
+
+/* ---------------- DIAGNOSTICS ---------------- */
+RENDER.diagnostics=()=>{
+  const v=U.q('#v-diagnostics');
+  const all=PROJECTS.flatMap(p=>p.diag.map(d=>({...d,p})));
+  const count=s=>all.filter(d=>d.sev===s).length;
+  v.innerHTML=`<div class="scroll">
+   <div class="vhead"><h1>Diagnostics</h1><p>Automatic checks over mesh quality, convergence, residuals, value distributions and unit consistency.</p></div>
+   <div class="sub">Each finding states what was observed, the evidence behind it, a possible cause and what to investigate next — not a conclusion about the design.</div>
+   <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+     <button class="btn sm primary" data-sev="all">All findings (${all.length})</button>
+     <button class="btn sm" data-sev="crit">Critical (${count('crit')})</button>
+     <button class="btn sm" data-sev="warn">Warnings (${count('warn')})</button>
+     <button class="btn sm" data-sev="info">Information (${count('info')})</button>
+   </div>
+   <div id="diagList" style="display:grid;gap:9px"></div></div>`;
+  const list=U.q('#diagList',v);
+  const draw=sev=>{
+    list.innerHTML=all.filter(d=>sev==='all'||d.sev===sev).map(d=>
+      findingHTML(d).replace('<span class="ttl">',`<span class="ttl"><span class="num" style="color:var(--ink-3);font-size:11px;margin-right:8px">${d.p.id}</span>`)).join('');
+    wireFindings(list);
+  };
+  draw('all');
+  U.qa('[data-sev]',v).forEach(b=>b.onclick=()=>{
+    U.qa('[data-sev]',v).forEach(x=>x.classList.remove('primary')); b.classList.add('primary'); draw(b.dataset.sev);
+  });
+};
+</script>
+<script>
+/* ---------------- AI ENGINEERING ASSISTANT ---------------- */
+const B=(k,t)=>({k,t});
+const KB=[
+ {q:['maximum stress','max stress','highest stress','where is stress'],proj:'BRK-114',
+  a:[B('data','Peak equivalent (von Mises) stress in BRK-114 LC3 is 214.6 MPa at node 48213, on the fillet root where the +Z rib meets the vertical flange, at (−34.2, 6.1, 0.4) mm. The second highest region is the upper flange edge at 141 MPa.'),
+     B('calc','As a fraction of the AA6061-T6 yield strength (276 MPa) that is 77.8 %, giving a factor of safety of 1.29.'),
+     B('rule','Peak values at re-entrant corners are treated as suspect until they converge: the stress here rose 2.3 % between the last two mesh levels, and the local peak-to-neighbourhood ratio is 2.23.'),
+     B('interp','The value is consistent with a genuine stress riser at a small fillet, but a mesh-driven singularity cannot be ruled out from this data alone.'),
+     B('rec','Run a fillet radius sweep (R0.5 / R1.0 / R2.0) at the current mesh level and compare path-averaged stress over twice the wall thickness before using 214.6 MPa as a design number.')],
+  ev:[['Peak σ_vm','214.6 MPa'],['Node','48213'],['Neighbourhood mean','96.4 MPa'],['Δ from mesh level 4→5','+0.7 %'],['Source','brk_114_static.rst, LC3']],
+  act:[['Open the stress result','fea']]},
+ {q:['80%','80 %','above 80','yield strength','regions above'],proj:'BRK-114',
+  a:[B('data','80 % of the AA6061-T6 yield strength is 220.8 MPa. No region of the bracket reaches that value: the maximum is 214.6 MPa, which is 77.8 % of yield.'),
+     B('calc','The volume above 70 % of yield (193.2 MPa) is 412 mm³, about 0.09 % of the bracket volume, all within 4 mm of the fillet root.'),
+     B('interp','On this load case the structure stays below the 80 % screening threshold, with the margin concentrated in one small region.'),
+     B('rec','Use the range filter on the stress result to display the top band directly, and repeat the check for LC2 where the transient peak occurs.')],
+  ev:[['Yield strength','276 MPa'],['80 % threshold','220.8 MPa'],['Max σ_vm','214.6 MPa'],['Volume above 70 % yield','412 mm³']],
+  act:[['Filter the view to the top 20 %','filter80']]},
+ {q:['convergence','converge','residual','poor convergence'],proj:'AER-207',
+  a:[B('data','In AER-207 the continuity residual falls to 8.4e−5 by iteration 980 and then flattens; momentum and turbulence residuals reach 4e−6 and 1e−5. The monitored Cd varies by ±0.3 % over the last 200 iterations and the mass imbalance is 0.021 % of the inlet flux.'),
+     B('rule','A residual plateau with stable integrated quantities is usually a sign of local unsteadiness or limited mesh quality rather than a failing solution; a diverging case would show the monitors drifting too.'),
+     B('data','Mesh quality in the wake block is the weakest part of the model: 812 cells sit below 0.15 orthogonal quality, and maximum skewness is 0.84.'),
+     B('interp','The most likely explanation is a genuinely unsteady rear wake that a steady RANS solution cannot settle, with poor cells in the same region limiting how far the residual can fall.'),
+     B('rec','Run 0.5 s of URANS or a scale-resolving model and check whether Cd and Cl stay within ±1 %; separately, rebuild the wake refinement transition to remove the single-level jump, then re-run the steady case and compare the residual floor.')],
+  ev:[['Continuity residual','8.4e−5'],['Target','1.0e−5'],['Cd drift, last 200 it.','±0.3 %'],['Mass imbalance','0.021 %'],['Cells < 0.15 ortho.','812'],['Source','aer_207_ext monitors']],
+  act:[['Open the convergence tab','cfd']]},
+ {q:['compare','difference between','a vs b','versus'],proj:'BRK-114',
+  a:[B('data','Comparing the baseline bracket with the 7 mm rib variant on LC3: peak von Mises falls from 214.6 to 184.5 MPa (−14.0 %), maximum deformation from 0.412 to 0.338 mm (−18.0 %), and the first natural frequency rises from 412.6 to 446.9 Hz.'),
+     B('calc','Minimum factor of safety improves from 1.29 to 1.50, at the cost of 144 g of added mass (+7.8 %).'),
+     B('rule','Both runs use the same mesh family, solver version and load definition, so the differences are attributable to the geometry change rather than to numerical settings.'),
+     B('interp','The variant buys safety margin and stiffness for a small mass penalty; whether that trade is worthwhile depends on the pack-level mass budget, which is outside this result set.'),
+     B('rec','Check the mass target with the pack integration owner, and confirm the stress reduction holds on LC2 where the transient peak occurs.')],
+  ev:[['A peak σ_vm','214.6 MPa'],['B peak σ_vm','184.5 MPa'],['Δ','−14.0 %'],['A mass','1.842 kg'],['B mass','1.986 kg']],
+  act:[['Open the comparison','comparison']]},
+ {q:['pressure drop','delta p','pumping','head loss'],proj:'THM-088',
+  a:[B('data','The cooling plate pressure drop is 18.6 kPa at 6 L/min, measured between the inlet and outlet plena. Channel velocity is 0.42 m/s and the hydraulic diameter is 14.2 mm.'),
+     B('calc','Channel Reynolds number is 1 957, so the flow is laminar. Pump hydraulic power at this operating point is 1.86 W.'),
+     B('rule','In laminar duct flow the pressure drop scales roughly with flow rate, while the heat transfer coefficient scales much more weakly — so raising flow rate costs pumping power faster than it buys cooling.'),
+     B('data','The 9 L/min case in this project shows that: Δp rises to 36.4 kPa (+96 %) while the peak temperature falls by 5.2 K.'),
+     B('rec','Compare the two operating points against the pump curve and the 55 °C limit together, and check the per-pass flow split before concluding that flow rate is the right lever.')],
+  ev:[['Δp at 6 L/min','18.6 kPa'],['Δp at 9 L/min','36.4 kPa'],['Channel Re','1 957'],['Pump power','1.86 W'],['Source','thm_088_cht.dat surface reports']],
+  act:[['Open the thermal workspace','thermal']]},
+ {q:['summary','technical summary','overview','brief me'],proj:'THM-088',
+  a:[B('data','Four simulations are loaded. BRK-114 (FEA) peaks at 214.6 MPa with FoS 1.29 and is verified. AER-207 (CFD) gives Cd 0.284 with a residual plateau and y+ excursions. THM-088 (thermal) reaches 58.3 °C against a 55 °C limit. MBD-052 peaks at 6 842 N in the lower ball joint, 92.5 % of its rating.'),
+     B('calc','Across the set there is one critical finding, four warnings and three information items.'),
+     B('interp','THM-088 is the only case that breaches a stated design limit, and it is the one that should govern the next design iteration. MBD-052 is close enough to a component rating that it warrants a fatigue duty check rather than a pass.'),
+     B('rec','Take the cooling plate to the 9 L/min and reversed-flow cases already defined, re-run AER-207 as URANS to close out the residual plateau, and request ball-joint S-N data before signing off MBD-052.')],
+  ev:[['Projects','4'],['Critical findings','1'],['Warnings','4'],['Design limits breached','1 (THM-088)']],
+  act:[['Open diagnostics','diagnostics'],['Build a report','reports']]},
+ {q:['drag','cd','aerodynamic'],proj:'AER-207',
+  a:[B('data','Cd is 0.284 on a 2.18 m² frontal area, with Cl −0.061. The wind-tunnel value for the same body is 0.291.'),
+     B('calc','Drag force at 100 km/h is 292.7 N from F = ½ρV²A·Cd, which costs 8.13 kW of aerodynamic power.'),
+     B('rule','A ±5 % band between CFD and tunnel data is the usual acceptance for external aero at this mesh density; this run is 2.4 % low.'),
+     B('interp','The result sits inside the correlation band, so Cd can be used for range estimation with the residual caveat noted in diagnostics.'),
+     B('rec','Repeat with the resolved underbody mesh before quoting Cd to three decimal places.')],
+  ev:[['Cd (CFD)','0.284'],['Cd (tunnel, sample)','0.291'],['Frontal area','2.18 m²'],['Drag force','292.7 N']],
+  act:[['Open the CFD workspace','cfd']]},
+ {q:['safe','safety factor','fos','is it ok','acceptable'],proj:'BRK-114',
+  a:[B('data','BRK-114 has a minimum factor of safety of 1.29 against yield on LC3, from a peak of 214.6 MPa and a yield strength of 276 MPa.'),
+     B('rule','Whether that is acceptable depends on the required margin for this component class, which is not held in this result set.'),
+     B('interp','The number itself is above unity with the peak located in a small region that has a convergence caveat attached, so the honest reading is: no yielding predicted on this load case, margin to be confirmed against the programme requirement.'),
+     B('rec','Confirm the required minimum FoS, then close out the fillet convergence question and repeat the check on LC2 before treating this as a pass.')],
+  ev:[['Min FoS','1.29'],['Peak σ_vm','214.6 MPa'],['Yield','276 MPa'],['Load case','LC3 combined']],
+  act:[['Open the validation centre','validation']]}
+];
+const FALLBACK={
+  a:[B('data','No stored result in this demo build matches that question directly. The loaded data covers four projects: BRK-114 structural, AER-207 external aero, THM-088 conjugate heat transfer and MBD-052 suspension dynamics.'),
+     B('rec','Try asking about peak stress and safety factor, CFD convergence and drag, cooling-plate temperatures and pressure drop, joint forces, or ask for a comparison or a technical summary.')],
+  ev:[['Result variables available','24'],['Projects loaded','4']],act:[]};
+const LBL={data:'Simulation data',calc:'Calculated',rule:'Engineering rule',interp:'AI interpretation',rec:'Recommendation'};
+RENDER.assistant=()=>{
+  const v=U.q('#v-assistant');
+  if(v.dataset.built)return;
+  v.dataset.built='1';
+  v.innerHTML=`<div class="chat">
+   <div class="msgs" id="msgs">
+     <div class="ans"><div class="ah">assistant · context: all loaded projects</div>
+      <div class="block"><span class="lbl data">${LBL.data}</span><span>Four projects are loaded with 24 result variables between them. I answer from the stored result data, from quantities I can derive from it, and from standard engineering practice — and I label which is which on every answer.</span></div>
+      <div class="block"><span class="lbl rec">${LBL.rec}</span><span>Ask about a specific result, or pick one of the questions below. Every answer lists the evidence it used.</span></div></div>
+   </div>
+   <div class="composer">
+     <div class="chips">${['Where is maximum stress?','Show regions above 80% of yield strength','Why might this CFD case have poor convergence?','Compare these simulations','Explain this pressure drop','Generate a technical summary','Is the bracket safe?'].map(c=>`<button class="chip">${c}</button>`).join('')}</div>
+     <div class="inrow"><input type="text" id="aiIn" placeholder="Ask about a result, a convergence issue, or a comparison"><button class="btn primary" id="aiGo">Ask</button></div>
+   </div></div>`;
+  const msgs=U.q('#msgs',v);
+  const ask=q=>{
+    if(!q.trim())return;
+    msgs.appendChild(U.el('div','msg me',q));
+    const lq=q.toLowerCase();
+    const hit=KB.find(k=>k.q.some(t=>lq.includes(t)))||FALLBACK;
+    const el=U.el('div','msg');
+    el.innerHTML=`<div class="ans"><div class="ah">assistant${hit.proj?' · context: '+hit.proj+' · '+P(hit.proj).file:''}</div>
+      ${hit.a.map(b=>`<div class="block"><span class="lbl ${b.k}">${LBL[b.k]}</span><span>${b.t}</span></div>`).join('')}
+      <div class="block"><span class="lbl data">Evidence used</span><div class="evidence" style="margin:0">
+        <table class="data">${hit.ev.map(e=>`<tr><td style="color:var(--ink-3)">${e[0]}</td><td class="n">${e[1]}</td></tr>`).join('')}</table></div></div>
+      ${hit.act&&hit.act.length?`<div class="block"><span class="lbl rec">Next step</span><span>${hit.act.map(a=>`<button class="btn sm" data-ai="${a[1]}" style="margin-right:6px">${a[0]}</button>`).join('')}</span></div>`:''}
+    </div>`;
+    msgs.appendChild(el); msgs.scrollTop=msgs.scrollHeight;
+    U.qa('[data-ai]',el).forEach(b=>b.onclick=()=>{
+      const t=b.dataset.ai;
+      if(t==='filter80'){ST.proj='BRK-114'; ST.varId='vonmises'; go('fea');
+        setTimeout(()=>{VIEWER.state.range=[.8,1]; ST.rtab='filters'; refreshAll(); U.toast('View filtered to the top 20 % of the stress range');},120);
+      } else {if(hit.proj)ST.proj=hit.proj; go(t);}
+    });
+  };
+  U.qa('.chip',v).forEach(c=>c.onclick=()=>ask(c.textContent));
+  U.q('#aiGo',v).onclick=()=>{const i=U.q('#aiIn',v); ask(i.value); i.value='';};
+  U.q('#aiIn',v).onkeydown=e=>{if(e.key==='Enter'){ask(e.target.value); e.target.value='';}};
+};
+
+/* ---------------- OPTIMIZATION ---------------- */
+RENDER.optimization=()=>{
+  const v=U.q('#v-optimization');
+  const doe=[[1,5.0,2.5,'—',214.6,1.842,1.29],[2,6.0,2.5,'—',201.8,1.914,1.37],[3,7.0,2.5,'—',184.5,1.986,1.50],
+             [4,5.0,3.5,'—',198.2,1.908,1.39],[5,6.0,3.5,'—',186.9,1.980,1.48],[6,7.0,3.5,'—',172.4,2.052,1.60],
+             [7,5.0,4.5,'—',189.6,1.974,1.46],[8,7.0,4.5,'—',164.1,2.118,1.68]];
+  const sens=[['Rib thickness',-0.62],['Fillet radius',-0.41],['Flange thickness',-0.28],['Bolt pretension',-0.09],['Friction coefficient',0.18]];
+  const pareto=doe.map(d=>[d[5],d[4]]);
+  const W=520,H=210;
+  const xs=pareto.map(p=>p[0]), ys=pareto.map(p=>p[1]);
+  const X=x=>50+(x-Math.min(...xs))/((Math.max(...xs)-Math.min(...xs))||1)*(W-70);
+  const Y=y=>18+(1-(y-Math.min(...ys))/((Math.max(...ys)-Math.min(...ys))||1))*(H-50);
+  v.innerHTML=`<div class="scroll">
+   <div class="vhead"><h1>Optimization and design studies</h1><p>Preview module. The design points below are sample data generated for the bracket study.</p></div>
+   <div class="sub">BRK-114 · 2-factor design of experiments · 8 points · objective: minimise peak stress at bounded mass</div>
+   <div class="grid g2" style="margin-bottom:14px">
+     <div class="slab"><header>Design of experiments</header>
+       <table class="data"><thead><tr><th>Point</th><th style="text-align:right">Rib t (mm)</th><th style="text-align:right">Fillet R (mm)</th><th style="text-align:right">σ_vm (MPa)</th><th style="text-align:right">Mass (kg)</th><th style="text-align:right">FoS</th></tr></thead>
+       <tbody>${doe.map(d=>`<tr><td class="num">DP${d[0]}</td><td class="n">${d[1].toFixed(1)}</td><td class="n">${d[2].toFixed(1)}</td>
+        <td class="n">${d[4].toFixed(1)}</td><td class="n">${d[5].toFixed(3)}</td><td class="n" style="color:var(--${d[6]>=1.5?'pass':'warn'})">${d[6].toFixed(2)}</td></tr>`).join('')}</tbody></table></div>
+     <div class="slab"><header>Trade-off: mass against peak stress</header>
+       <div style="padding:10px"><svg class="plot" viewBox="0 0 ${W} ${H}">
+        <line class="ax" x1="50" y1="${H-32}" x2="${W-20}" y2="${H-32}"/><line class="ax" x1="50" y1="14" x2="50" y2="${H-32}"/>
+        ${pareto.map((p,i)=>`<circle cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="4.5" fill="${i===2?'var(--accent)':'var(--info)'}"/>
+          <text x="${(X(p[0])+7).toFixed(1)}" y="${(Y(p[1])+3).toFixed(1)}">DP${i+1}</text>`).join('')}
+        <text x="${W-20}" y="${H-12}" text-anchor="end">Mass (kg)</text><text x="10" y="20">σ_vm (MPa)</text></svg>
+        <p class="hint" style="padding:0 2px">DP3 is the variant carried into the comparison view. Points are sample data, not a solved optimisation.</p></div></div>
+   </div>
+   <div class="grid g2">
+     <div class="slab"><header>Sensitivity of peak stress to each input</header>
+       <div class="body" style="display:grid;gap:9px">
+       ${sens.map(s=>{const w=Math.abs(s[1])*100;
+         return `<div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>${s[0]}</span>
+           <span class="num" style="color:var(--ink-3)">${s[1]>0?'+':''}${s[1].toFixed(2)}</span></div>
+           <div class="bardiff"><div class="track"><i class="${s[1]>0?'up':'down'}" style="left:${s[1]>0?50:50-w/2}%;width:${w/2}%"></i></div></div></div>`;}).join('')}
+       <p class="hint">Standardised regression coefficients over the 8 design points. Magnitude ranks the inputs; sign shows the direction of the effect on peak stress.</p>
+       </div></div>
+     <div class="slab"><header>Surrogate model</header>
+       <div class="body">
+        <table class="data">
+         <tr><td style="color:var(--ink-3)">Model type</td><td class="n">Kriging (anisotropic)</td></tr>
+         <tr><td style="color:var(--ink-3)">Training points</td><td class="n">8</td></tr>
+         <tr><td style="color:var(--ink-3)">Cross-validated R²</td><td class="n">0.962</td></tr>
+         <tr><td style="color:var(--ink-3)">Max residual</td><td class="n">4.1 MPa</td></tr>
+         <tr><td style="color:var(--ink-3)">State</td><td class="n"><span class="pill info">preview</span></td></tr>
+        </table>
+        <p class="hint">A surrogate fitted to eight points can rank designs but should not be used to extrapolate outside the sampled range, and it carries none of the mesh convergence uncertainty recorded for the underlying runs.</p>
+       </div></div>
+   </div></div>`;
+};
+</script>
+<script>
+/* ---------------- REPORTS ---------------- */
+const SECTIONS=['Project','Simulation','Solver','Mesh','Materials','Boundary conditions','Loads','Convergence','Results',
+ 'Calculations','Validation','Diagnostics','Comparison','AI interpretation','Conclusions','Appendix'];
+let PICK=new Set(SECTIONS);
+RENDER.reports=()=>{
+  const v=U.q('#v-reports'), p=P(ST.proj);
+  v.innerHTML=`<div class="scroll" style="display:flex;flex-direction:column;height:100%;padding-bottom:20px">
+   <div class="vhead"><h1>Engineering report</h1><p>Assembled from the stored result model — nothing in the document is typed by hand.</p></div>
+   <div class="sub">Source project: ${p.name} · ${p.id}</div>
+   <div class="rep" style="flex:1;min-height:420px">
+    <div class="slab secpick"><header>Sections<span class="r"><button class="btn sm" id="allSec">All</button><button class="btn sm" id="noSec">None</button></span></header>
+      <div class="fill" style="overflow:auto">
+      ${SECTIONS.map(s=>`<label class="chk"><input type="checkbox" data-sec="${s}" ${PICK.has(s)?'checked':''}> ${s}</label>`).join('')}
+      </div>
+      <div style="padding:10px;border-top:1px solid var(--line);display:grid;gap:7px">
+        <div style="display:flex;gap:7px;flex-wrap:wrap">${PROJECTS.map(x=>`<button class="btn sm ${x.id===ST.proj?'primary':''}" data-rp="${x.id}">${x.id}</button>`).join('')}</div>
+        <button class="btn primary" id="expPdf">Export as PDF</button>
+        <button class="btn" id="expHtml">Export as HTML</button>
+      </div></div>
+    <div class="doc" id="doc"></div>
+   </div></div>`;
+  const doc=U.q('#doc',v);
+  const build=()=>{
+    const has=s=>PICK.has(s);
+    const t=[];
+    t.push(`<h2>${p.name} — engineering report</h2>
+      <div class="meta">${p.id} · ${p.domain} · ${p.type} · issued ${new Date().toISOString().slice(0,10)} · ${p.owner}</div>
+      <p style="border-left:2px solid var(--warn);padding-left:10px">All values in this document are simulated sample data from a demonstration build and are not suitable for design release.</p>`);
+    if(has('Project'))t.push(`<h3>1 Project</h3><p>${p.name} is analysed as ${p.type.toLowerCase()}. The result model was imported from ${p.file} (${p.size}) and holds ${VARS[p.geom].length} result variables across ${p.cases.length} defined cases.</p>`);
+    if(has('Simulation'))t.push(`<h3>2 Simulation</h3><p>Cases defined: ${p.cases.join('; ')}. Results are attached to the first case; the remaining cases are defined but not imported.</p>`);
+    if(has('Solver'))t.push(`<h3>3 Solver</h3><p>${p.solver}, wall time ${p.wall}, run ${p.run}.</p>`);
+    if(has('Mesh'))t.push(`<h3>4 Mesh</h3>${tbl(Object.entries(p.mesh))}`);
+    if(has('Materials'))t.push(`<h3>5 Materials</h3>${tbl(p.materials.map(m=>[m.n,m.p]))}`);
+    if(has('Boundary conditions'))t.push(`<h3>6 Boundary conditions</h3>${tbl(p.bcs.map(m=>[m.n,m.p]))}`);
+    if(has('Loads'))t.push(`<h3>7 Loads</h3>${tbl(p.loads.map(m=>[m.n,m.p]))}`);
+    if(has('Convergence'))t.push(`<h3>8 Convergence</h3><p>${p.valid.filter(c=>/converg|balance|integrator/i.test(c.n)).map(c=>c.m).join(' ')||'Convergence evidence is recorded in the validation section.'}</p>`);
+    if(has('Results'))t.push(`<h3>9 Results</h3>${tbl(p.keyvals)}<p>Peak locations and node identifiers for each variable are held in the result model and reproduced in the appendix.</p>`);
+    if(has('Calculations'))t.push(`<h3>10 Engineering calculations</h3>`+p.calcs.map(c=>
+      `<p><b style="color:var(--ink)">${c.n}</b><br><span class="num">${c.f}</span><br>${c.i.map(i=>i[0]+' = '+i[1]).join(' · ')}<br>Result: <b class="num" style="color:var(--ink)">${c.r} ${c.u}</b><br><i>Assumptions: ${c.a}</i></p>`).join(''));
+    if(has('Validation'))t.push(`<h3>11 Validation</h3>${tbl(p.valid.map(c=>[c.n+' — '+STATUS_LABEL[c.s],c.m]))}`);
+    if(has('Diagnostics'))t.push(`<h3>12 Diagnostics</h3>`+p.diag.map(d=>`<p><b style="color:var(--ink)">${d.t}</b> (${d.sev==='crit'?'critical':d.sev==='warn'?'warning':'information'}) — ${d.loc}.<br>Evidence: ${d.ev.map(e=>e[0]+' '+e[1]).join('; ')}.<br>Possible cause: ${d.cause}<br>Recommended investigation: ${d.action}</p>`).join(''));
+    if(has('Comparison')&&COMPARE[p.id])t.push(`<h3>13 Comparison</h3><p>${COMPARE[p.id].a} against ${COMPARE[p.id].b}.</p>${tbl(COMPARE[p.id].rows.map(r=>[r[0]+' ['+r[1]+']','A '+r[2]+' → B '+r[3]+'  ('+((r[3]-r[2])/Math.abs(r[2])*100).toFixed(1)+' %)']))}`);
+    if(has('AI interpretation'))t.push(`<h3>14 Interpretation</h3><p>Interpretation is separated from measured and derived values. ${p.status==='crit'?'This case breaches a stated design limit and the breach governs the next iteration.':p.status==='warn'?'This case meets its primary targets but carries open warnings that limit how firmly the numbers can be quoted.':'This case meets its primary targets, with the open items recorded in diagnostics.'}</p>`);
+    if(has('Conclusions'))t.push(`<h3>15 Conclusions</h3><p>${p.keyvals.map(k=>k[0]+' is '+k[1]).join('. ')}. Overall validation state: ${STATUS_LABEL[p.status]}. Outstanding actions are listed against each diagnostic finding.</p>`);
+    if(has('Appendix'))t.push(`<h3>16 Appendix</h3>${tbl(VARS[p.geom].map(x=>[x.label+' ['+x.unit+']','min '+U.n(x.min,3)+' · max '+U.n(x.max,3)+(x.node?' · node '+x.node:'')]))}`);
+    doc.innerHTML=t.join('');
+  };
+  const tbl=rows=>`<table class="data" style="margin:6px 0 4px">${rows.map(r=>`<tr><td style="color:var(--ink-3);width:230px">${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
+  U.qa('[data-sec]',v).forEach(c=>c.onchange=()=>{c.checked?PICK.add(c.dataset.sec):PICK.delete(c.dataset.sec); build();});
+  U.q('#allSec',v).onclick=()=>{PICK=new Set(SECTIONS); RENDER.reports();};
+  U.q('#noSec',v).onclick=()=>{PICK=new Set(); RENDER.reports();};
+  U.qa('[data-rp]',v).forEach(b=>b.onclick=()=>{ST.proj=b.dataset.rp; RENDER.reports();});
+  U.q('#expPdf',v).onclick=()=>U.toast('PDF export is not enabled in the demo build — the document above is the rendered report');
+  U.q('#expHtml',v).onclick=()=>U.toast('HTML export is not enabled in the demo build');
+  build();
+};
+
+/* ---------------- DATA & FILES ---------------- */
+RENDER.data=()=>{
+  const v=U.q('#v-data');
+  const schema=[['Mesh topology','nodes, elements, connectivity, element type','all'],
+   ['Named sets','node sets, element sets, surfaces, zones','all'],
+   ['Unit system','length, mass, time, temperature, derived units','all'],
+   ['Steps','load steps, time steps, frequencies, iterations','all'],
+   ['Result fields','scalar, vector and tensor fields with location (nodal / elemental / face)','all'],
+   ['Provenance','source file, solver version, import timestamp, reader version','all'],
+   ['Derived fields','quantities computed by this application, marked as derived','all']];
+  v.innerHTML=`<div class="scroll">
+   <div class="vhead"><h1>Data and files</h1><p>Imported result files and how they map into the common result model.</p></div>
+   <div class="sub">Demo build — files are simulated entries, no data is read from disk.</div>
+   <div class="slab" style="margin-bottom:14px"><header>Imported files</header>
+    <table class="data"><thead><tr><th>File</th><th>Project</th><th>Solver</th><th>Size</th><th>Imported</th><th>Units resolved</th><th>Parser</th></tr></thead><tbody>
+    ${PROJECTS.map(p=>`<tr class="clickrow" data-proj="${p.id}"><td class="num">${p.file}</td><td>${p.name}</td><td>${p.solver}</td>
+      <td class="n">${p.size}</td><td class="num" style="font-size:11.5px">${p.run}</td>
+      <td><span class="pill pass">consistent</span></td><td><span class="pill pass">mapped</span></td></tr>`).join('')}
+    <tr><td class="num" style="color:var(--ink-3)">susp_kc_rig_2026.csv</td><td>Vehicle Suspension — MBD</td><td>Test rig export</td>
+      <td class="n">4 MB</td><td class="num" style="font-size:11.5px">—</td><td><span class="pill warn">units not declared</span></td><td><span class="pill idle">not mapped</span></td></tr>
+    </tbody></table></div>
+   <div class="grid g2">
+    <div class="slab"><header>Common result model</header>
+     <table class="data"><thead><tr><th>Entity</th><th>Contents</th></tr></thead><tbody>
+     ${schema.map(s=>`<tr><td><b style="font-weight:500">${s[0]}</b></td><td style="color:var(--ink-2)">${s[1]}</td></tr>`).join('')}</tbody></table></div>
+    <div class="slab"><header>Unit handling</header>
+     <table class="data"><tbody>
+      ${[['Structural projects','mm · kg · N · s · MPa'],['CFD projects','m · kg · s · Pa · K'],['Thermal projects','mm · W · K'],
+         ['Conversion policy','converted on import, original units retained in provenance'],
+         ['Mixed-unit detection','flagged as a diagnostic, never silently converted'],
+         ['Temperature','stored in K, displayed in °C where configured']]
+       .map(r=>`<tr><td style="color:var(--ink-3)">${r[0]}</td><td class="num" style="font-size:11.5px">${r[1]}</td></tr>`).join('')}
+     </tbody></table>
+     <p class="hint" style="padding:0 12px 12px">One file in this project declares no unit system. It stays unmapped until the units are supplied, rather than being assumed.</p></div>
+   </div></div>`;
+  wire(v);
+};
+
+/* ---------------- SETTINGS ---------------- */
+RENDER.settings=()=>{
+  const v=U.q('#v-settings');
+  v.innerHTML=`<div class="scroll">
+   <div class="vhead"><h1>Settings</h1><p>Display, units and analysis defaults for this workstation.</p></div>
+   <div class="sub">Settings apply to the current session in this demo build.</div>
+   <div class="grid g2">
+    <div class="slab"><header>Appearance</header><div class="body" style="display:grid;gap:12px">
+      <div><label style="font-size:11.5px;color:var(--ink-3)">Theme</label>
+        <select id="setTheme"><option value="dark">Dark (workstation)</option><option value="light">Light</option></select></div>
+      <div><label style="font-size:11.5px;color:var(--ink-3)">Default colour map</label>
+        <select id="setCmap">${Object.keys(CMAPS).map(c=>`<option>${c}</option>`).join('')}</select></div>
+      <div><label style="font-size:11.5px;color:var(--ink-3)">Numerical precision</label>
+        <select id="setPrec"><option>2 decimals</option><option selected>3 decimals</option><option>4 decimals</option><option>Scientific</option></select></div>
+      <label class="chk" style="padding-left:0"><input type="checkbox" checked> Show element edges by default</label>
+      <label class="chk" style="padding-left:0"><input type="checkbox" checked> Label demo data in every view</label>
+    </div></div>
+    <div class="slab"><header>Units</header><div class="body" style="display:grid;gap:12px">
+      <div><label style="font-size:11.5px;color:var(--ink-3)">Structural unit system</label>
+        <select><option selected>mm · kg · N · s · MPa</option><option>m · kg · N · s · Pa</option><option>in · lb · s · psi</option></select></div>
+      <div><label style="font-size:11.5px;color:var(--ink-3)">Temperature display</label>
+        <select><option selected>°C</option><option>K</option><option>°F</option></select></div>
+      <label class="chk" style="padding-left:0"><input type="checkbox" checked> Flag mixed unit systems as a diagnostic</label>
+      <label class="chk" style="padding-left:0"><input type="checkbox" checked> Keep original units in provenance</label>
+    </div></div>
+    <div class="slab"><header>Analysis defaults</header><div class="body" style="display:grid;gap:12px">
+      <div><label style="font-size:11.5px;color:var(--ink-3)">Mesh convergence acceptance</label><input type="text" value="2 % change between last two levels"></div>
+      <div><label style="font-size:11.5px;color:var(--ink-3)">Stress screening threshold</label><input type="text" value="80 % of yield"></div>
+      <div><label style="font-size:11.5px;color:var(--ink-3)">CFD residual target</label><input type="text" value="1e−5 continuity"></div>
+      <div><label style="font-size:11.5px;color:var(--ink-3)">y+ acceptance band</label><input type="text" value="30 – 100 (wall functions)"></div>
+    </div></div>
+    <div class="slab"><header>AI engineering assistant</header><div class="body" style="display:grid;gap:10px">
+      <label class="chk" style="padding-left:0"><input type="checkbox" checked disabled> Label every statement by source type</label>
+      <label class="chk" style="padding-left:0"><input type="checkbox" checked disabled> Attach the evidence used to each answer</label>
+      <label class="chk" style="padding-left:0"><input type="checkbox" checked> Allow the assistant to change the active view</label>
+      <label class="chk" style="padding-left:0"><input type="checkbox"> Include interpretation blocks in exported reports</label>
+      <p class="hint">Source labelling and evidence cannot be switched off: an answer without its evidence is not a usable engineering statement.</p>
+    </div></div>
+   </div>
+   <div class="slab" style="margin-top:14px"><header>About this build</header><div class="body" style="font-size:12.3px;color:var(--ink-2);max-width:80ch">
+     Demonstration build of the CAE Results Analyzer post-processing layer. It runs on four sample projects with synthetic result fields so the workflow — import, validate, post-process, diagnose, compare, interpret, report — can be exercised end to end. No solver is included and no result file is read from disk.
+   </div></div></div>`;
+  U.q('#setTheme',v).value=document.documentElement.dataset.theme;
+  U.q('#setTheme',v).onchange=e=>document.documentElement.dataset.theme=e.target.value;
+  U.q('#setCmap',v).onchange=e=>{if(VIEWER){VIEWER.state.cmap=e.target.value; if(VIEWER.vr){VIEWER.paint(); renderLegend();}} U.toast('Default colour map: '+e.target.value);};
+};
+
+/* ---------------- calculation sheet in the dock ---------------- */
+function renderCalcs(host){
+  const p=P(ST.proj);
+  host.innerHTML=`<div style="padding:10px;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))">
+   ${p.calcs.map(c=>`<div class="calc">
+     <div class="ch">${c.n}<span class="pill info" style="margin-left:auto">derived</span></div>
+     <div class="formula">${c.f}</div>
+     <div class="ins">${c.i.map(i=>`<div><span style="color:var(--ink-3)">${i[0]}</span><span>${i[1]}</span></div>`).join('')}</div>
+     <div class="res"><span style="color:var(--ink-3);font-size:11.5px">Result</span><b>${c.r} <span style="font-size:12px;color:var(--ink-2)">${c.u}</span></b></div>
+     <div class="assump"><b style="color:var(--ink-2);font-weight:500">Assumptions.</b> ${c.a}</div>
+   </div>`).join('')}</div>`;
+}
+const _renderDock=renderDock;
+renderDock=function(){ if(ST.dock==='calculations'){renderCalcs(U.q('#dockBody')); return;} _renderDock(); };
+
+/* ---------------- init ---------------- */
+U.q('#stGL').textContent=window.WebGLRenderingContext?'WebGL ready':'WebGL unavailable';
+badgeCounts();
+go('home');
+</script>
+</body>
+</html>
