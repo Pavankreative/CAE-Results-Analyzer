@@ -108,6 +108,22 @@ Or start both with `./scripts/dev.sh`.
 docker compose up --build     # frontend on :8080, backend on :8000
 ```
 
+### Desktop app
+
+Runs the API and UI together as one native window instead of two terminals
+and a browser tab:
+
+```bash
+cd frontend && npm install && npm run build && cd ..
+pip install -r desktop/requirements.txt
+python desktop/desktop_app.py
+```
+
+See [desktop/README.md](desktop/README.md) for platform requirements
+(WebView2 on Windows, WKWebView on macOS, GTK/Qt on Linux) and how to build a
+standalone executable with PyInstaller. Without a display or a supported
+WebView backend, it falls back to opening your default browser.
+
 ---
 
 ## Testing

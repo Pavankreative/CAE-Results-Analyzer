@@ -3,10 +3,12 @@ from __future__ import annotations
 import logging
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
 from app.core.config import settings
@@ -58,7 +60,23 @@ async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
-@app.get("/")
-def root() -> dict:
-    return {"app": settings.app_name, "version": settings.version,
-            "docs": "/docs", "api": "/api/health"}
+FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+if FRONTEND_DIST.exists():
+    # Desktop / production mode: the built frontend is served from the same
+    # process as the API, so a single command starts the whole application.
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/")
+    def root() -> FileResponse:
+        return FileResponse(FRONTEND_DIST / "index.html")
+
+    @app.get("/{full_path:path}")
+    def spa_fallback(full_path: str) -> FileResponse:
+        # Anything that isn't /api/... or /assets/... is a client-side route.
+        return FileResponse(FRONTEND_DIST / "index.html")
+else:
+    @app.get("/")
+    def root() -> dict:
+        return {"app": settings.app_name, "version": settings.version,
+                "docs": "/docs", "api": "/api/health"}
