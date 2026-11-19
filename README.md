@@ -129,15 +129,76 @@ WebView backend, it falls back to opening your default browser.
 ## Testing
 
 ```bash
-# backend — 87 tests: model, statistics, calculations, adapters, validation,
+# backend — model, statistics, calculations, adapters, validation,
 # diagnostics, comparison, assistant, reports, API
-cd backend && python -m pytest tests -q
+python -m pip install -r backend/requirements-dev.txt
+python scripts/generate_samples.py
+python -m pytest -c backend/pytest.ini backend/tests -q
 
 # frontend — client and colour-map unit tests, type check, production build
-cd frontend && npm run typecheck && npm test && npm run build
+(cd frontend && npm run typecheck && npm test && npm run build)
 ```
 
 `tests/verify_install.sh` runs all of the above in one pass and is what CI executes.
+
+---
+
+## Node-ID-safe result comparison
+
+Comparison computes **B minus A**, aligning B's result rows to A by explicit
+Node ID before any pointwise subtraction. Reordering an otherwise identical
+node table and its associated results returns exactly `0.0` difference.
+Equal row counts alone never establish correspondence.
+
+The Python `compare()` API raises `ComparisonValidationError` (a `ValueError`)
+and the comparison/report HTTP endpoints return **422** for incompatible data:
+
+- Node IDs must be explicitly supplied, unique integers, and present for every node.
+- The complete ID sets must match. Missing/extra nodes are errors; there is no
+  implicit intersection, interpolation, or scalar-only fallback.
+- Unit-system declarations and compared field-unit strings must match exactly.
+  Convert units explicitly before import; aliases are not silently normalised.
+  Dimensionless fields need an explicit label such as `-` or `1`.
+- Matching IDs must have matching finite **reference** coordinates (absolute
+  tolerance `1e-9` in the declared length unit, zero relative tolerance).
+  Meshes from changed geometry require an explicit mapping workflow, not ID reuse.
+- Selected fields must be nodal, have matching field types and valid lengths,
+  contain finite values, and have matching selected load-step/time values
+  (absolute tolerance `1e-12`, zero relative tolerance).
+- Vector-field comparisons retain the existing **difference of magnitudes**
+  definition. They are not component-wise vector differences and cannot detect
+  a pure direction change at constant magnitude.
+
+Generated display indices are **not** solver Node IDs. CSV/VTK imports currently
+without explicit identity support can still be viewed and analysed individually,
+but cannot be pointwise-compared. Saving/reloading native JSON preserves this
+restriction. Legacy files that previously saved generated row indices as IDs
+must be re-imported with trustworthy source IDs; provenance cannot be recovered
+from those old integers alone. The synthetic fixture generator explicitly owns
+and assigns its reference-mesh IDs; its results remain labelled synthetic.
+
+Run from the repository root (Python 3.10+):
+
+```bash
+python -m pip install -r backend/requirements-dev.txt
+python scripts/generate_samples.py
+python -m pytest -c backend/pytest.ini backend/tests/test_comparison_node_ids.py -q
+python -m pytest -c backend/pytest.ini backend/tests -q
+python -m uvicorn app.main:app --app-dir backend --port 8000
+```
+
+With the API running, this self-comparison must return zero differences:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/compare \
+  -H 'Content-Type: application/json' \
+  -d '{"simulation_a":"brk-114","simulation_b":"brk-114","fields":["von_mises"],"step":-1}'
+```
+
+Regression coverage includes reordered nonconsecutive IDs, known signed stress
+changes, the original bracket-data reproduction, missing/duplicate IDs, unit
+mismatch, incompatible geometry/steps, API/report errors and native roundtrips.
+These are software verification checks, not validation of a physical design.
 
 ---
 
@@ -196,8 +257,9 @@ and useful for trying the import page.
 - Only surface (triangulated) meshes are carried. Volume elements are stored as metadata when an
   adapter reads them, but no volume rendering or element-based post-processing exists yet.
 - Elemental fields are modelled but the bundled data and viewport are nodal.
-- Comparison computes pointwise differences only when both results share a node count; no
-  mesh-to-mesh interpolation is implemented.
+- Pointwise comparison requires explicit Node IDs, identical ID sets and units, matching
+  reference coordinates and compatible selected steps. Incompatible inputs raise validation
+  errors; no mesh interpolation, automatic unit conversion or scalar-only fallback is implemented.
 - The assistant is a retrieval layer over the application's own data. It has no language model, so
   it answers a fixed set of intents and says plainly when a question does not match one.
 - Reports export to Markdown, HTML and JSON. There is no PDF writer.

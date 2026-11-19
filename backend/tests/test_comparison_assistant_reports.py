@@ -1,6 +1,6 @@
 import pytest
 
-from app.analysis.comparison import compare
+from app.analysis.comparison import ComparisonValidationError, compare
 from app.services import assistant, reports
 
 
@@ -23,11 +23,9 @@ def test_compare_reports_percentage_change(bracket, store, tmp_path):
     assert maxrow["percent"] == pytest.approx(-14.0, abs=0.5)
 
 
-def test_compare_across_different_meshes_stays_scalar(bracket, plate):
-    res = compare(bracket, plate)
-    assert res["same_mesh"] is False
-    assert res["field_differences"] == []
-    assert "interpolation" in res["mesh_note"]
+def test_compare_across_unrelated_models_rejects_comparison(bracket, plate):
+    with pytest.raises(ComparisonValidationError):
+        compare(bracket, plate)
 
 
 def test_compare_overlays_convergence_monitors(aero):

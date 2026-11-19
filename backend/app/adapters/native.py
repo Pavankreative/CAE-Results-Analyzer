@@ -65,7 +65,7 @@ class NativeJSONAdapter(BaseAdapter):
         mesh = Mesh(
             nodes=np.asarray(m["nodes"], dtype=np.float64),
             triangles=np.asarray(m["triangles"], dtype=np.int32),
-            node_ids=np.asarray(m["node_ids"]) if m.get("node_ids") else None,
+            node_ids=np.asarray(m["node_ids"]) if m.get("node_ids") is not None else None,
             elements=m.get("elements", []),
             metrics=m.get("metrics", {}),
             part_ids=np.asarray(m["part_ids"], dtype=np.int32) if m.get("part_ids") else None,
@@ -131,7 +131,8 @@ class NativeJSONAdapter(BaseAdapter):
             "mesh": {
                 "nodes": r(sim.mesh.nodes),
                 "triangles": sim.mesh.triangles.tolist(),
-                "node_ids": sim.mesh.node_ids.tolist(),
+                # Never promote generated display indices into solver Node IDs on save.
+                "node_ids": sim.mesh.node_ids.tolist() if sim.mesh.node_ids_explicit else None,
                 "parts": sim.mesh.parts,
                 "part_ids": sim.mesh.part_ids.tolist() if sim.mesh.part_ids is not None else None,
                 "metrics": sim.mesh.metrics,

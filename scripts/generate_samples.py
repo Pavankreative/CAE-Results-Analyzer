@@ -79,7 +79,9 @@ def bracket() -> Simulation:
     contact = np.outer(scale, gauss(np.abs(y + 15) / 12, 0.4) * gauss(np.abs(x - 18) / 40, 0.7) * 96.4)
     energy = 0.5 * vm * strain
 
-    mesh = Mesh(nodes=nodes, triangles=tris, part_ids=pids, parts=names,
+    # This generator owns the synthetic reference mesh and assigns its persistent IDs.
+    mesh = Mesh(nodes=nodes, triangles=tris, node_ids=np.arange(1, len(nodes) + 1),
+                part_ids=pids, parts=names,
                 metrics={"Nodes": len(nodes), "Elements": int(len(tris)),
                          "Element type": "SOLID187 / CONTA174 (surface skin exported)",
                          "Average quality": 0.842, "Max skewness": 0.61,
@@ -167,7 +169,9 @@ def aero_body() -> Simulation:
         },
         converged=False, criterion=1e-5)
 
-    mesh = Mesh(nodes=nodes, triangles=tris, part_ids=pids, parts=names,
+    # This generator owns the synthetic reference mesh and assigns its persistent IDs.
+    mesh = Mesh(nodes=nodes, triangles=tris, node_ids=np.arange(1, len(nodes) + 1),
+                part_ids=pids, parts=names,
                 metrics={"Nodes": len(nodes), "Elements": int(len(tris)),
                          "Element type": "Poly-hexcore (surface skin exported)",
                          "Prism layers": 12, "Max skewness": 0.84,
@@ -229,7 +233,9 @@ def cold_plate() -> Simulation:
     grad = np.outer(scale, 0.1 + 6.7 * gauss(np.abs(np.cos(z / 14.0)), 0.3))
     htc = np.tile(180 + 4080 * gauss(np.abs(np.sin(z / 14.0 + 0.5)), 0.4), (len(scale), 1))
 
-    mesh = Mesh(nodes=nodes, triangles=tris, part_ids=pids, parts=names,
+    # This generator owns the synthetic reference mesh and assigns its persistent IDs.
+    mesh = Mesh(nodes=nodes, triangles=tris, node_ids=np.arange(1, len(nodes) + 1),
+                part_ids=pids, parts=names,
                 metrics={"Nodes": len(nodes), "Elements": int(len(tris)),
                          "Element type": "Poly + hex channel (surface skin exported)",
                          "Solid/fluid interfaces": 2, "Average quality": 0.79})
@@ -299,7 +305,9 @@ def suspension() -> Simulation:
     force = np.outer(2000 + 4842 * np.abs(phase), force_shape / force_shape.max())
     torque = force * 0.045
 
-    mesh = Mesh(nodes=nodes, triangles=tris, part_ids=pids, parts=names,
+    # This generator owns the synthetic reference mesh and assigns its persistent IDs.
+    mesh = Mesh(nodes=nodes, triangles=tris, node_ids=np.arange(1, len(nodes) + 1),
+                part_ids=pids, parts=names,
                 metrics={"Nodes": len(nodes), "Elements": int(len(tris)), "Bodies": 9,
                          "Joints": 11, "Degrees of freedom": 2, "Integrator": "GSTIFF I3"})
     sim = Simulation(
@@ -354,7 +362,8 @@ def main() -> int:
         path = NativeJSONAdapter.write(sim, out / f"{sim.id}.json", decimals=4)
         size = path.stat().st_size / 1e6
         print(f"{sim.id:10s} {sim.domain.value:9s} {sim.mesh.n_nodes:6d} nodes  "
-              f"{len(sim.fields)} fields  {size:.2f} MB  -> {path.relative_to(ROOT)}")
+              f"{len(sim.fields)} fields  {size:.2f} MB  -> "
+              f"{path.relative_to(ROOT) if path.is_relative_to(ROOT) else path}")
     return 0
 
 

@@ -69,3 +69,10 @@ Every error body is `{"detail": "..."}` with a message intended to be shown to t
 | `CAER_CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated allowed origins |
 | `CAER_LOG_LEVEL` | `INFO` | Logging level |
 | `CAER_MAX_UPLOAD_MB` | `200` | Upload size limit |
+
+### Comparison validation
+
+`POST /compare` and reports containing a comparison return HTTP 422 with a
+`detail` message when Node-ID correspondence, units, coordinates, nodal field
+compatibility or selected steps fail validation. There is no implicit scalar-only
+fallback for incompatible meshes. See the root README for the full contract.

@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from app.adapters import AdapterError, registry
 from app.analysis import calculations as calc
 from app.analysis import statistics as stats
-from app.analysis.comparison import compare
+from app.analysis.comparison import ComparisonValidationError, compare
 from app.analysis.diagnostics import run_diagnostics
 from app.analysis.validation import run_validation
 from app.api.schemas import (
@@ -240,7 +240,10 @@ def delete_simulation(sid: str, store: Store = Depends(store_dep)) -> None:
 @router.post("/compare")
 def compare_simulations(body: CompareRequest, store: Store = Depends(store_dep)) -> Dict[str, Any]:
     a, b = _sim(store, body.simulation_a), _sim(store, body.simulation_b)
-    return compare(a, b, body.fields, body.step)
+    try:
+        return compare(a, b, body.fields, body.step)
+    except ComparisonValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/assistant/query")
@@ -266,7 +269,10 @@ def build_report(body: ReportRequest, store: Store = Depends(store_dep)):
     else:
         project = store.project_of(sim.id)
     other = _sim(store, body.compare_with) if body.compare_with else None
-    report = report_service.build_report(sim, project, body.sections, other)
+    try:
+        report = report_service.build_report(sim, project, body.sections, other)
+    except ComparisonValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if body.format == "json":
         return report
     if body.format == "html":

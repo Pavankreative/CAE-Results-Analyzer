@@ -88,14 +88,20 @@ class Mesh:
     metrics: Dict[str, Any] = dc_field(default_factory=dict)
     part_ids: Optional[np.ndarray] = None  # (n_tris,) part index per triangle
     parts: List[str] = dc_field(default_factory=list)
+    node_ids_explicit: bool = dc_field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.nodes = np.asarray(self.nodes, dtype=np.float64)
         self.triangles = np.asarray(self.triangles, dtype=np.int32)
+        self.node_ids_explicit = self.node_ids is not None
         if self.node_ids is None:
             self.node_ids = np.arange(1, len(self.nodes) + 1, dtype=np.int64)
         else:
-            self.node_ids = np.asarray(self.node_ids, dtype=np.int64)
+            self.node_ids = np.asarray(self.node_ids)
+            if (self.node_ids.ndim != 1 or len(self.node_ids) != len(self.nodes)
+                    or self.node_ids.dtype.kind not in "iu"
+                    or len(np.unique(self.node_ids)) != len(self.node_ids)):
+                raise ValueError("node_ids must contain one unique integer Node ID per node")
         if self.nodes.ndim != 2 or self.nodes.shape[1] != 3:
             raise ValueError("nodes must have shape (n, 3)")
         if len(self.triangles) and self.triangles.max() >= len(self.nodes):

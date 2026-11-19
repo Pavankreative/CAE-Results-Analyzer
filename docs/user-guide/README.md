@@ -48,9 +48,13 @@ Project tree │ 3D result viewport │ Analysis & properties
 
 ## Comparison
 
-Pick simulation A and B. You get scalar comparison per field and metric with percentage change,
-pointwise difference statistics when the two share a mesh, derived-quantity deltas and overlaid
-histories. Selecting the same simulation twice is a useful sanity check: every delta should be zero.
+Pick compatible simulations A and B. Results are B minus A after explicit Node-ID
+alignment, never row-index subtraction. Both datasets must have unique, explicit
+Node IDs with identical sets, matching reference coordinates and units, and
+compatible nodal fields and selected steps. Invalid comparisons return a specific
+validation error instead of partial or scalar-only output. Vector fields compare
+magnitudes. Different meshes require an explicit mapping workflow, which is not
+implemented. See the root README for tolerances and regression-test commands.
 
 ## Validation
 

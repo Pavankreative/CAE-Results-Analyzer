@@ -28,6 +28,10 @@ the engineer would look up. `parts` and `part_ids` support per-part visibility. 
 `metrics` carry whatever the adapter could read about the volume mesh.
 
 Construction validates that no triangle references a node outside the array.
+Explicit `node_ids` must be unique integers, one per node. If absent, display
+indices are generated and `node_ids_explicit` is false. Those indices cannot be
+used for pointwise comparison. Native serialization writes `node_ids: null` for
+such meshes so a save/load cycle does not manufacture identity provenance.
 
 ## ResultField
 
